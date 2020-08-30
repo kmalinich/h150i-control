@@ -75,9 +75,9 @@ function handleResponse(data) {
 		default : packetValue = null;
 	}
 
-	const packet = { packetType, packetValue };
-	console.log('hndlRes() :: data: %o', data);
-	console.log('hndlRes() :: packet: %s', JSON.stringify(packet, null, 2));
+	// const packet = { packetType, packetValue };
+	// console.log('hndlRes() :: data: %o', data);
+	// console.log('hndlRes() :: packet: %s', JSON.stringify(packet, null, 2));
 
 	status[packetType] = packetValue;
 }
@@ -118,15 +118,15 @@ async function getInfo() {
 		return error;
 	}
 
-	console.log('getInfo() :: status: %s', JSON.stringify(status, null, 2));
-
 	return true;
 } // getInfo()
 
 async function getData() {
 	if (shuttingDown !== false) return;
 
-	console.log('getData() :: begin');
+	// console.log('getData() :: begin');
+
+	await getPumpMode();
 
 	try {
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0xA9 ], resolve, reject));
@@ -163,8 +163,6 @@ async function getData() {
 		console.error(error);
 		return error;
 	}
-
-	await getPumpMode();
 
 	try {
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0x31 ], resolve, reject));
@@ -364,8 +362,9 @@ async function term() {
 async function run() {
 	await init();
 	await getInfo();
+	await getData();
 
-	intervalGetData = setInterval(async () => { await getData(); }, 1000);
+	intervalGetData = setInterval(getData, 2000);
 }
 
 
