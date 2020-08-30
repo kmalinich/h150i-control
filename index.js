@@ -1,21 +1,44 @@
-let usb = require('usb');
+const usb = require('usb');
 
 
-let device = usb.findByIds(0x1B1C, 0x0C12);
+async function term() {
+	console.log('endpointIn polling stop begin');
+	await endpointIn.stopPoll();
+	console.log('endpointIn polling stop end\n');
+
+
+	try {
+		console.log('deviceInterface release begin');
+		await deviceInterface.release();
+		console.log('deviceInterface release end');
+	}
+	catch (error) {
+		console.log('deviceInterface release error');
+		console.error(error);
+		return;
+	}
+
+	console.log('deviceInterface release OK\n');
+
+
+	console.log('device close');
+	await device.close();
+}
+
+
+const device = usb.findByIds(0x1B1C, 0x0C12);
 
 console.log('device open');
 device.open();
 
-
-
-let deviceInterface = device.interfaces[0];
+const deviceInterface = device.interfaces[0];
 
 console.log('deviceInterface claim');
 deviceInterface.claim();
 
 
-let endpointIn  = deviceInterface.endpoints[0];
-let endpointOut = deviceInterface.endpoints[1];
+const endpointIn  = deviceInterface.endpoints[0];
+const endpointOut = deviceInterface.endpoints[1];
 
 
 endpointIn.on('data', (data) => {
@@ -71,31 +94,7 @@ endpointOut.transfer([ 0xAA ], (error) => {
 			console.log('transfer 3 OK\n');
 
 
-			setTimeout(() => {
-				console.log('endpointIn polling stop begin');
-				endpointIn.stopPoll(() => {
-					console.log('endpointIn polling stop end\n');
-
-
-					console.log('deviceInterface release begin');
-					deviceInterface.release((error) => {
-						console.log('deviceInterface release end');
-
-						if (error) {
-							console.log('deviceInterface release error');
-							console.error(error);
-							return;
-						}
-
-						console.log('deviceInterface release OK\n');
-
-
-						console.log('device close');
-						device.close();
-						process.exit();
-					});
-				});
-			}, 1000);
+			setTimeout(term, 1000);
 		});
 	});
 });
