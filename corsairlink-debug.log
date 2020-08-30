@@ -1,0 +1,22 @@
+[INFO] Setting pump to mode: 3
+asetekpro_pump_mode_quiet() :: commands = 32 00
+asetekpro_pump_mode_quiet() :: write response = 32 12 34 00 00
+
+asetekpro_pump_mode_read() :: commands = 33
+asetekpro_pump_mode_read() :: read response = 33 12 34 00
+
+
+[INFO] Setting pump to mode: 4
+asetekpro_pump_mode_balanced() :: commands = 32 01
+asetekpro_pump_mode_balanced() :: write response = 32 12 34 00 00
+
+asetekpro_pump_mode_read() :: commands = 33
+asetekpro_pump_mode_read() :: read response = 33 12 34 01
+
+
+[INFO] Setting pump to mode: 5
+asetekpro_pump_mode_performance() :: commands = 32 02
+asetekpro_pump_mode_performance() :: write response = 32 12 34 00 00
+
+asetekpro_pump_mode_read() :: commands = 33
+asetekpro_pump_mode_read() :: read response = 33 12 34 02

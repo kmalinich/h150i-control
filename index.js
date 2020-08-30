@@ -54,7 +54,7 @@ function handleResponse(data) {
 	switch (data[0]) {
 		case 0x31 : packetValue = data.readInt16BE(3); break;
 
-		case 0x32 : packetValue = Boolean(data[3] === 0x00 && data[4] === 0x00); break;
+		case 0x32 : packetValue = Boolean(data[1] === 0x12 && data[2] === 0x34); break;
 
 		case 0x33 :
 			switch (data[3]) {
@@ -75,9 +75,9 @@ function handleResponse(data) {
 		default : packetValue = null;
 	}
 
-	// const packet = { packetType, packetValue };
-	// console.log('hndlRes() :: data: %o', data);
-	// console.log('hndlRes() :: packet: %s', JSON.stringify(packet, null, 2));
+	const packet = { packetType, packetValue };
+	console.log('hndlRes() :: data: %o', data);
+	console.log('hndlRes() :: packet: %s', JSON.stringify(packet, null, 2));
 
 	status[packetType] = packetValue;
 }
