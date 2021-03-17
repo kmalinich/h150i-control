@@ -20,6 +20,8 @@ const status = {
 		pumpMode  : null,
 		pumpSpeed : null,
 
+		setPumpMode : null,
+
 		temperature : null,
 	},
 
@@ -174,10 +176,10 @@ async function updatePumpMode() {
 
 
 	let pumpModeTarget = 'performance';
-	if (status.data.temperature < 27) {
+	if (status.data.temperature < 33) {
 		pumpModeTarget = 'quiet';
 	}
-	else if (status.data.temperature < 29) {
+	else if (status.data.temperature < 34) {
 		pumpModeTarget = 'balanced';
 	}
 
@@ -203,13 +205,13 @@ async function setPumpMode(newPumpMode) {
 	}
 
 	try {
-		console.log('setPumpMode()            :: setting pumpMode %s, pumpModeId %o', newPumpMode, newPumpModeId);
+		console.log('setPumpMode()        :: setting pumpMode %o, pumpModeId %o', newPumpMode, newPumpModeId);
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0x32, newPumpModeId ], resolve, reject));
 		await new Promise(resolve => setTimeout(resolve, globalDelay));
 		await getPumpMode();
 	}
 	catch (setPumpModeError) {
-		console.log('setPumpMode()            :: setPumpModeError');
+		console.log('setPumpMode()        :: setPumpModeError');
 		console.dir(setPumpModeError, { depth : null, showHidden : true });
 		await term(10);
 	}
