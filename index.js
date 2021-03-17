@@ -7,6 +7,11 @@ let endpointIn;
 let endpointOut;
 
 let shuttingDown = false;
+let firstRun = true;
+
+let isClaimed = false;
+let isOpen    = false;
+let isPolling = false;
 
 let intervalGetData;
 
@@ -90,7 +95,8 @@ async function getPumpMode() {
 	catch (error) {
 		console.log('getPumpMode() :: error');
 		console.error(error);
-		return error;
+		await term();
+		process.exit(2);
 	}
 } // getPumpMode()
 
@@ -106,7 +112,8 @@ async function getInfo() {
 	catch (error) {
 		console.log('getInfo() :: transfer 1 error');
 		console.error(error);
-		return error;
+		await term();
+		process.exit(3);
 	}
 
 	try {
@@ -115,13 +122,21 @@ async function getInfo() {
 	catch (error) {
 		console.log('getInfo() :: transfer 2 error');
 		console.error(error);
-		return error;
+		await term();
+		process.exit(4);
 	}
 
 	return true;
 } // getInfo()
 
 async function getData() {
+	if (firstRun === true) {
+		firstRun = false;
+	}
+	else {
+		await init();
+	}
+
 	if (shuttingDown !== false) return;
 
 	// console.log('getData() :: begin');
@@ -134,7 +149,8 @@ async function getData() {
 	catch (error) {
 		console.log('getData() :: transfer 3 error');
 		console.error(error);
-		return error;
+		await term();
+		process.exit(5);
 	}
 
 	try {
@@ -143,7 +159,8 @@ async function getData() {
 	catch (error) {
 		console.log('getData() :: transfer 4 error');
 		console.error(error);
-		return error;
+		await term();
+		process.exit(6);
 	}
 
 	try {
@@ -152,7 +169,8 @@ async function getData() {
 	catch (error) {
 		console.log('getData() :: transfer 5 error');
 		console.error(error);
-		return error;
+		await term();
+		process.exit(7);
 	}
 
 	try {
@@ -161,7 +179,8 @@ async function getData() {
 	catch (error) {
 		console.log('getData() :: transfer 6 error');
 		console.error(error);
-		return error;
+		await term();
+		process.exit(8);
 	}
 
 	try {
@@ -170,18 +189,21 @@ async function getData() {
 	catch (error) {
 		console.log('getData() :: transfer 8 error');
 		console.error(error);
-		return error;
+		await term();
+		process.exit(9);
 	}
 
 	console.log('getData() :: status: %s', JSON.stringify(status, null, 2));
 
-	updatePumpMode();
+	await updatePumpMode();
+
+	await term();
 
 	return true;
 } // getData()
 
 
-function updatePumpMode() {
+async function updatePumpMode() {
 	if (typeof status.pumpMode !== 'string' || status.pumpMode === '' || status.pumpMode === null) {
 		console.log('updatePumpMode() :: missing pumpMode');
 		return;
@@ -205,7 +227,7 @@ function updatePumpMode() {
 
 	console.log('updatePumpMode() :: pumpModeTarget = \'%s\'', pumpModeTarget);
 
-	setPumpMode(pumpModeTarget);
+	await setPumpMode(pumpModeTarget);
 } // updatePumpMode()
 
 async function setPumpMode(newPumpMode) {
@@ -224,64 +246,80 @@ async function setPumpMode(newPumpMode) {
 	catch (error) {
 		console.log('setPumpMode() :: error');
 		console.error(error);
-		return error;
+		await term();
+		process.exit(10);
 	}
 } // setPumpMode(newPumpMode)
 
 
 // Configure term event listeners
 async function termConfig() {
-	process.on('SIGTERM', async () => {
+	process.once('SIGTERM', async () => {
 		console.log('\nCaught SIGTERM');
 		shuttingDown = true;
+		clearInterval(intervalGetData);
 		await term();
+		process.exit(1);
 	});
 
-	process.on('SIGINT', async () => {
+	process.once('SIGINT', async () => {
 		console.log('\nCaught SIGINT');
 		shuttingDown = true;
+		clearInterval(intervalGetData);
 		await term();
+		process.exit(0);
 	});
 
-	process.on('exit', async () => {
+	process.once('exit', async () => {
 		console.log('Caught exit event');
+		clearInterval(intervalGetData);
 		shuttingDown = true;
 	});
 } // term_config()
 
 async function init() {
-	await termConfig();
+	if (firstRun === true) {
+		await termConfig();
 
-	device = await usb.findByIds(0x1B1C, 0x0C12);
-
-	try {
-		console.log('init()    :: device open start');
-		await device.open();
-		console.log('init()    :: device open end');
-	}
-	catch (error) {
-		console.log('init()    :: device open error');
-		console.error(error);
-		return error;
+		device = await usb.findByIds(0x1B1C, 0x0C12);
 	}
 
-	console.log('init()    :: device open OK');
+	if (isOpen === false) {
+		try {
+			console.log('init()    :: device open start');
+			await device.open();
+			console.log('init()    :: device open end');
+		}
+		catch (error) {
+			console.log('init()    :: device open error');
+			console.error(error);
+			await term();
+			process.exit(11);
+		}
+
+		console.log('init()    :: device open OK');
+		isOpen = true;
+	}
 
 	deviceInterface = device.interfaces[0];
 
 
-	try {
-		console.log('init()    :: deviceInterface claim start');
-		await deviceInterface.claim();
-		console.log('init()    :: deviceInterface claim end');
-	}
-	catch (error) {
-		console.log('init()    :: endpointIn polling start error');
-		console.error(error);
-		return error;
-	}
+	if (isClaimed === false) {
+		try {
+			console.log('init()    :: deviceInterface claim start');
+			await deviceInterface.claim();
+			console.log('init()    :: deviceInterface claim end');
+		}
+		catch (error) {
+			console.log('init()    :: endpointIn polling start error');
+			console.error(error);
+			await term();
+			process.exit(12);
+		}
 
-	console.log('init()    :: deviceInterface claim OK');
+		console.log('init()    :: deviceInterface claim OK');
+		isClaimed = true;
+	}
 
 
 	endpointIn  = deviceInterface.endpoints[0];
@@ -289,83 +327,98 @@ async function init() {
 
 	endpointIn.on('data', handleResponse);
 
-	endpointIn.on('error', error => {
+	endpointIn.once('error', async (error) => {
 		console.log('dataIn()  :: error');
 		console.error(error);
+		await term();
+		process.exit(13);
 	});
 
 
-	try {
-		console.log('init()    :: endpointIn polling start begin');
-		await endpointIn.startPoll();
-		console.log('init()    :: endpointIn polling start end');
-	}
-	catch (error) {
-		console.log('init()    :: endpointIn polling start error');
-		console.error(error);
-		return error;
-	}
+	if (isPolling === false) {
+		try {
+			console.log('init()    :: endpointIn polling start begin');
+			await endpointIn.startPoll();
+			console.log('init()    :: endpointIn polling start end');
+		}
+		catch (error) {
+			console.log('init()    :: endpointIn polling start error');
+			console.error(error);
+			await term();
+			process.exit(14);
+		}
 
-	console.log('init()    :: endpointIn polling start OK');
+		console.log('init()    :: endpointIn polling start OK');
+		isPolling = true;
+	}
 
 	return true;
 } // init()
 
 async function term() {
-	clearInterval(intervalGetData);
+	console.log('term()');
 
-	try {
-		console.log('term()    :: endpointIn polling stop begin');
-		await new Promise(resolve => endpointIn.stopPoll(resolve));
-		console.log('term()    :: endpointIn polling stop end');
-	}
-	catch (error) {
-		console.log('term()    :: device close error');
-		console.error(error);
-		return error;
-	}
+	endpointIn.removeAllListeners('data');
+	endpointIn.removeAllListeners('error');
 
-	console.log('term()    :: endpointIn polling stop OK');
+	if (isPolling === true) {
+		try {
+			console.log('term()    :: endpointIn polling stop begin');
+			await new Promise(resolve => endpointIn.stopPoll(resolve));
+			console.log('term()    :: endpointIn polling stop end');
+		}
+		catch (error) {
+			console.log('term()    :: device close error');
+			console.error(error);
+			process.exit(15);
+		}
 
-
-	try {
-		console.log('term()    :: deviceInterface release begin');
-		await new Promise(resolve => deviceInterface.release(resolve));
-		console.log('term()    :: deviceInterface release end');
-	}
-	catch (error) {
-		console.log('term()    :: deviceInterface release error');
-		console.error(error);
-		throw error;
+		console.log('term()    :: endpointIn polling stop OK');
+		isPolling = false;
 	}
 
-	console.log('term()    :: deviceInterface release OK');
 
+	if (isClaimed === true) {
+		try {
+			console.log('term()    :: deviceInterface release begin');
+			await new Promise(resolve => deviceInterface.release(resolve));
+			console.log('term()    :: deviceInterface release end');
+		}
+		catch (error) {
+			console.log('term()    :: deviceInterface release error');
+			console.error(error);
+			process.exit(15);
+		}
 
-	try {
-		console.log('term()    :: device close begin');
-		await device.close();
-		console.log('term()    :: device close end');
+		console.log('term()    :: deviceInterface release OK');
+		isClaimed = false;
 	}
-	catch (error) {
-		console.log('term()    :: device close error');
-		console.error(error);
-		return error;
-	}
 
-	console.log('term()    :: device close OK\n');
+
+	if (isOpen === true) {
+		try {
+			console.log('term()    :: device close begin');
+			await device.close();
+			console.log('term()    :: device close end');
+		}
+		catch (error) {
+			console.log('term()    :: device close error');
+			console.error(error);
+			process.exit(16);
+		}
+
+		console.log('term()    :: device close OK\n');
+		isOpen = false;
+	}
 
 	return true;
 } // term()
 
 
-async function run() {
+(async () => {
 	await init();
 	await getInfo();
 	await getData();
 
-	intervalGetData = setInterval(getData, 2000);
-}
-
-
-run();
+	// intervalGetData = setInterval(getData, 500);
+})();
