@@ -7,11 +7,13 @@ let endpointIn;
 let endpointOut;
 
 let shuttingDown = false;
-let firstRun = true;
 
-let isClaimed = false;
-let isOpen    = false;
-let isPolling = false;
+const deviceStatus = {
+	claimed : false,
+	open    : false,
+	polling : false,
+};
+
 
 let intervalGetData;
 
@@ -35,6 +37,7 @@ const status = {
 
 function handleResponse(data) {
 	let packetType;
+
 	switch (data[0]) {
 		case 0x31 : packetType = 'pumpSpeed';   break;
 		case 0x32 : packetType = 'setPumpMode'; break;
@@ -55,7 +58,9 @@ function handleResponse(data) {
 		default : packetType = 'unknown';
 	}
 
+
 	let packetValue;
+
 	switch (data[0]) {
 		case 0x31 : packetValue = data.readInt16BE(3); break;
 
@@ -80,127 +85,127 @@ function handleResponse(data) {
 		default : packetValue = null;
 	}
 
+
 	const packet = { packetType, packetValue };
-	console.log('hndlRes() :: data: %o', data);
-	console.log('hndlRes() :: packet: %s', JSON.stringify(packet, null, 2));
+	console.log('hndlRes()        :: data: %o', data);
+	console.log('hndlRes()        :: packet: %s', JSON.stringify(packet, null, 2));
 
 	status[packetType] = packetValue;
-}
+} // handleResponse(data)
 
 
 async function getPumpMode() {
 	try {
+		console.log('getPumpMode()    :: getPumpModeStep0');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0x33 ], resolve, reject));
 	}
-	catch (getPumpModeError) {
-		console.log('getPumpMode() :: getPumpModeError');
-		console.dir(getPumpModeError, { depth : null, showHidden : true });
+	catch (getPumpModeStep0Error) {
+		console.log('getPumpMode()    :: getPumpModeStep0Error');
+		console.dir(getPumpModeStep0Error, { depth : null, showHidden : true });
 		await term();
 		process.exit(2);
 	}
-} // getPumpMode()
+} // async getPumpMode()
 
 
 async function getInfo() {
 	if (shuttingDown !== false) return;
 
-	console.log('getInfo() :: begin');
-
 	try {
+		console.log('getInfo()        :: getInfoStep0');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0xAA ], resolve, reject));
 	}
 	catch (getInfoStep0Error) {
-		console.log('getInfo() :: getInfoStep0Error');
+		console.log('getInfo()        :: getInfoStep0Error');
 		console.dir(getInfoStep0Error, { depth : null, showHidden : true });
 		await term();
 		process.exit(3);
 	}
 
 	try {
+		console.log('getInfo()        :: getInfoStep1');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0xAB ], resolve, reject));
 	}
 	catch (getInfoStep1Error) {
-		console.log('getInfo() :: getInfoStep1Error');
+		console.log('getInfo()        :: getInfoStep1Error');
 		console.dir(getInfoStep1Error, { depth : null, showHidden : true });
 		await term();
 		process.exit(4);
 	}
 
 	return true;
-} // getInfo()
+} // async getInfo()
 
 async function getData() {
-	if (firstRun === true) {
-		firstRun = false;
-	}
-	else {
-		await init();
-	}
-
 	if (shuttingDown !== false) return;
 
-	// console.log('getData() :: begin');
+	// console.log('getData()        :: begin');
 
 	await getPumpMode();
 
 	try {
+		console.log('getData()        :: getDataStep0');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0xA9 ], resolve, reject));
 	}
 	catch (getDataStep0Error) {
-		console.log('getData() :: getDataStep0Error');
+		console.log('getData()        :: getDataStep0Error');
 		console.dir(getDataStep0Error, { depth : null, showHidden : true });
 		await term();
 		process.exit(5);
 	}
 
 	try {
+		console.log('getData()        :: getDataStep1');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x00 ], resolve, reject));
 	}
 	catch (getDataStep1Error) {
-		console.log('getData() :: getDataStep1Error');
+		console.log('getData()        :: getDataStep1Error');
 		console.dir(getDataStep1Error, { depth : null, showHidden : true });
 		await term();
 		process.exit(6);
 	}
 
 	try {
+		console.log('getData()        :: getDataStep2');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x01 ], resolve, reject));
 	}
 	catch (getDataStep2Error) {
-		console.log('getData() :: getDataStep2Error');
+		console.log('getData()        :: getDataStep2Error');
 		console.dir(getDataStep2Error, { depth : null, showHidden : true });
 		await term();
 		process.exit(7);
 	}
 
 	try {
+		console.log('getData()        :: getDataStep3');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x02 ], resolve, reject));
 	}
 	catch (getDataStep3Error) {
-		console.log('getData() :: getDataStep3Error');
+		console.log('getData()        :: getDataStep3Error');
 		console.dir(getDataStep3Error, { depth : null, showHidden : true });
 		await term();
 		process.exit(8);
 	}
 
 	try {
+		console.log('getData()        :: getDataStep4');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0x31 ], resolve, reject));
 	}
 	catch (getDataStep4Error) {
-		console.log('getData() :: getDataStep4Error');
+		console.log('getData()        :: getDataStep4Error');
 		console.dir(getDataStep4Error, { depth : null, showHidden : true });
 		await term();
 		process.exit(9);
 	}
 
-	console.log('getData() :: status: %s', JSON.stringify(status, null, 2));
+	console.log('getData()        :: status: %s', JSON.stringify(status, null, 2));
 
 	await updatePumpMode();
 
 	await term();
 
 	return true;
-} // getData()
+} // async getData()
 
 
 async function updatePumpMode() {
@@ -228,7 +233,7 @@ async function updatePumpMode() {
 	console.log('updatePumpMode() :: pumpModeTarget = \'%s\'', pumpModeTarget);
 
 	await setPumpMode(pumpModeTarget);
-} // updatePumpMode()
+} // async updatePumpMode()
 
 async function setPumpMode(newPumpMode) {
 	let newPumpModeId = 0x02;
@@ -239,17 +244,17 @@ async function setPumpMode(newPumpMode) {
 	}
 
 	try {
-		console.log('setPumpMode() :: setting pumpMode %s, pumpModeId %o', newPumpMode, newPumpModeId);
+		console.log('setPumpMode()        :: setting pumpMode %s, pumpModeId %o', newPumpMode, newPumpModeId);
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0x32, newPumpModeId ], resolve, reject));
 		await getPumpMode();
 	}
 	catch (setPumpModeError) {
-		console.log('setPumpMode() :: setPumpModeError');
+		console.log('setPumpMode()        :: setPumpModeError');
 		console.dir(setPumpModeError, { depth : null, showHidden : true });
 		await term();
 		process.exit(10);
 	}
-} // setPumpMode(newPumpMode)
+} // async setPumpMode(newPumpMode)
 
 
 // Configure term event listeners
@@ -275,147 +280,184 @@ async function termConfig() {
 		clearInterval(intervalGetData);
 		shuttingDown = true;
 	});
-} // term_config()
+} // async term_config()
 
 async function init() {
-	if (firstRun === true) {
-		await termConfig();
+	device = await usb.findByIds(0x1B1C, 0x0C12);
 
-		device = await usb.findByIds(0x1B1C, 0x0C12);
-	}
-
-	if (isOpen === false) {
+	if (deviceStatus.open === false) {
 		try {
-			console.log('init()    :: device open start');
+			console.log('init()           :: device open start');
 			await device.open();
-			console.log('init()    :: device open end');
+			console.log('init()           :: device open end');
 		}
 		catch (deviceOpenError) {
-			console.log('init()    :: deviceOpenError');
+			console.log('init()           :: deviceOpenError');
 			console.dir(deviceOpenError, { depth : null, showHidden : true });
 			await term();
 			process.exit(11);
 		}
 
-		console.log('init()    :: device open OK');
-		isOpen = true;
+		console.log('init()           :: device open OK');
+		deviceStatus.open = true;
 	}
 
-	deviceInterface = device.interfaces[0];
+	try {
+		console.log('init()           :: device reset start');
+		await new Promise((resolve, reject) => device.reset(resolve, reject));
+		console.log('init()           :: device reset end');
+	}
+	catch (deviceResetError) {
+		console.log('init()           :: deviceResetError');
+		console.dir(deviceResetError, { depth : null, showHidden : true });
+		await term();
+		process.exit(12);
+	}
+
+	console.log('init()           :: device reset OK');
 
 
-	if (isClaimed === false) {
+	deviceInterface = device.interface(0);
+
+
+	if (deviceStatus.claimed === false) {
 		try {
-			console.log('init()    :: deviceInterface claim start');
+			console.log('init()           :: deviceInterface claim start');
 			await deviceInterface.claim();
-			console.log('init()    :: deviceInterface claim end');
+			console.log('init()           :: deviceInterface claim end');
 		}
 		catch (deviceInterfaceClaimError) {
-			console.log('init()    :: deviceInterfaceClaimError');
+			console.log('init()           :: deviceInterfaceClaimError');
+			console.dir({ deviceStatus });
 			console.dir(deviceInterfaceClaimError, { depth : null, showHidden : true });
 			await term();
 			process.exit(12);
 		}
 
-		console.log('init()    :: deviceInterface claim OK');
-		isClaimed = true;
+		console.log('init()           :: deviceInterface claim OK');
+		deviceStatus.claimed = true;
 	}
 
 
 	endpointIn  = deviceInterface.endpoints[0];
 	endpointOut = deviceInterface.endpoints[1];
 
+	// console.dir({ endpointIn, endpointOut }, { depth : null, showHidden : true });
+
+	// Set endpoint transfer timeout
+	endpointIn.timeout  = 100;
+	endpointOut.timeout = 100;
+
+
+	// Configure endpoint event listeners
 	endpointIn.on('data', handleResponse);
 
 	endpointIn.on('error', async endpointInError => {
-		console.log('dataIn()  :: endpointInError');
+		console.log('dataIn()         :: endpointInError');
 		console.dir(endpointInError, { depth : null, showHidden : true });
 		await term();
 		process.exit(13);
 	});
 
+	endpointOut.on('error', async endpointOutError => {
+		console.log('dataOut()         :: endpointOutError');
+		console.dir(endpointOutError, { depth : null, showHidden : true });
+		await term();
+		process.exit(13);
+	});
 
-	if (isPolling === false) {
+
+	if (deviceStatus.polling === false) {
 		try {
-			console.log('init()    :: endpointIn polling start begin');
+			console.log('init()           :: endpointIn polling start begin');
 			await endpointIn.startPoll();
-			console.log('init()    :: endpointIn polling start end');
+			console.log('init()           :: endpointIn polling start end');
 		}
 		catch (endpointInStartPollError) {
-			console.log('init()    :: endpointInStartPollError');
+			console.log('init()           :: endpointInStartPollError');
 			console.dir(endpointInStartPollError, { depth : null, showHidden : true });
 			await term();
 			process.exit(14);
 		}
 
-		console.log('init()    :: endpointIn polling start OK');
-		isPolling = true;
+		console.log('init()           :: endpointIn polling start OK');
+		deviceStatus.polling = true;
 	}
 
 	return true;
-} // init()
+} // async init()
 
 async function term() {
-	console.log('term()');
+	console.log('term()           :: start');
 
-	endpointIn.removeAllListeners('data');
-	endpointIn.removeAllListeners('error');
+	if (typeof endpointIn !== 'undefined') {
+		endpointIn.removeAllListeners('data');
+		endpointIn.removeAllListeners('error');
+	}
 
-	if (isPolling === true) {
+	if (typeof endpointOut !== 'undefined') {
+		endpointOut.removeAllListeners('error');
+	}
+
+	if (deviceStatus.polling === true) {
 		try {
-			console.log('term()    :: endpointIn polling stop begin');
+			console.log('term()           :: endpointIn polling stop begin');
 			await new Promise(resolve => endpointIn.stopPoll(resolve));
-			console.log('term()    :: endpointIn polling stop end');
+			console.log('term()           :: endpointIn polling stop end');
 		}
 		catch (endpointInStopPollError) {
-			console.log('term()    :: endpointInStopPollError');
+			console.log('term()           :: endpointInStopPollError');
+			console.dir({ deviceStatus });
 			console.dir(endpointInStopPollError, { depth : null, showHidden : true });
 			process.exit(15);
 		}
 
-		console.log('term()    :: endpointIn polling stop OK');
-		isPolling = false;
+		console.log('term()           :: endpointIn polling stop OK');
+		deviceStatus.polling = false;
 	}
 
 
-	if (isClaimed === true) {
+	if (deviceStatus.claimed === true) {
 		try {
-			console.log('term()    :: deviceInterface release begin');
-			await new Promise(resolve => deviceInterface.release(resolve));
-			console.log('term()    :: deviceInterface release end');
+			console.log('term()           :: deviceInterface release begin');
+			await new Promise(resolve => deviceInterface.release(true, resolve));
+			console.log('term()           :: deviceInterface release end');
 		}
 		catch (deviceInterfaceReleaseError) {
-			console.log('term()    :: deviceInterfaceReleaseError');
+			console.log('term()           :: deviceInterfaceReleaseError');
+			console.dir({ deviceStatus });
 			console.dir(deviceInterfaceReleaseError, { depth : null, showHidden : true });
 			process.exit(15);
 		}
 
-		console.log('term()    :: deviceInterface release OK');
-		isClaimed = false;
+		console.log('term()           :: deviceInterface release OK');
+		deviceStatus.claimed = false;
 	}
 
 
-	if (isOpen === true) {
+	if (deviceStatus.open === true) {
 		try {
-			console.log('term()    :: device close begin');
+			console.log('term()           :: device close begin');
 			await device.close();
-			console.log('term()    :: device close end');
+			console.log('term()           :: device close end');
 		}
 		catch (deviceCloseError) {
-			console.log('term()    :: deviceCloseError');
+			console.log('term()           :: deviceCloseError');
+			console.dir({ deviceStatus });
 			console.dir(deviceCloseError, { depth : null, showHidden : true });
 			process.exit(16);
 		}
 
-		console.log('term()    :: device close OK\n');
-		isOpen = false;
+		console.log('term()           :: device close OK\n');
+		deviceStatus.open = false;
 	}
 
 	return true;
-} // term()
+} // async term()
 
 
 (async () => {
+	await termConfig();
 	await init();
 	await getInfo();
 	await getData();
