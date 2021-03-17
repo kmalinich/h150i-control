@@ -1,15 +1,9 @@
 const usb = require('usb');
 
-let device;
-let deviceInterface;
-
-let endpointIn;
-let endpointOut;
-
-let shuttingDown = false;
 
 const globalDelay   = 50;
 const globalTimeout = 500;
+
 
 const deviceStatus = {
 	claimed : false,
@@ -17,30 +11,39 @@ const deviceStatus = {
 	polling : false,
 };
 
+const status = {
+	data : {
+		fan0Speed : null,
+		fan1Speed : null,
+		fan2Speed : null,
+
+		pumpMode  : null,
+		pumpSpeed : null,
+
+		temperature : null,
+	},
+
+	version : {
+		firmware : null,
+		hardware : null,
+	},
+};
+
+
+let device;
+let deviceInterface;
+
+let endpointIn;
+let endpointOut;
 
 let intervalGetData;
 
-
-const status = {
-	fan0Speed : null,
-	fan1Speed : null,
-	fan2Speed : null,
-
-	firmwareVersion : null,
-	hardwareVersion : null,
-
-	pumpMode  : null,
-	pumpSpeed : null,
-
-	setPumpMode : null,
-
-	temperature : null,
-};
+let shuttingDown = false;
 
 
 async function getFirmwareVersion() {
 	try {
-		console.log('getFirmwareVersion() :: getFirmwareVersionStep0');
+		// console.log('getFirmwareVersion() :: getFirmwareVersionStep0');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0xAA ], resolve, reject));
 		await new Promise(resolve => setTimeout(resolve, globalDelay));
 	}
@@ -54,7 +57,7 @@ async function getFirmwareVersion() {
 
 async function getHardwareVersion() {
 	try {
-		console.log('getHardwareVersion() :: getHardwareVersionStep0');
+		// console.log('getHardwareVersion() :: getHardwareVersionStep0');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0xAB ], resolve, reject));
 		await new Promise(resolve => setTimeout(resolve, globalDelay));
 	}
@@ -66,64 +69,24 @@ async function getHardwareVersion() {
 	}
 } // async getHardwareVersion()
 
-async function getInfo() {
-	if (shuttingDown !== false) return;
 
-	console.log('getInfo()            :: begin');
-
-	await getFirmwareVersion();
-	await getHardwareVersion();
-
-	return true;
-} // async getInfo()
-
-
-async function getFan0Speed() {
+async function getFanSpeed(fanId) {
 	try {
-		console.log('getFan0Speed() :: getFan0Speed');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x00 ], resolve, reject));
+		// console.log('getFanSpeed(%o)       :: getFanSpeed', fanId);
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, fanId ], resolve, reject));
 		await new Promise(resolve => setTimeout(resolve, globalDelay));
 	}
-	catch (getFan0SpeedError) {
-		console.log('getFan0Speed() :: getFan0SpeedError');
-		console.dir(getFan0SpeedError, { depth : null, showHidden : true });
-		await term();
-		process.exit(2);
+	catch (getFanSpeedError) {
+		console.log('getFanSpeed(%o)       :: getFanSpeedError', fanId);
+		console.dir(getFanSpeedError, { depth : null, showHidden : true });
+		await term(2);
 	}
-} // async getFan0Speed()
-
-async function getFan1Speed() {
-	try {
-		console.log('getFan1Speed() :: getFan1Speed');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x01 ], resolve, reject));
-		await new Promise(resolve => setTimeout(resolve, globalDelay));
-	}
-	catch (getFan1SpeedError) {
-		console.log('getFan1Speed() :: getFan1SpeedError');
-		console.dir(getFan1SpeedError, { depth : null, showHidden : true });
-		await term();
-		process.exit(2);
-	}
-} // async getFan1Speed()
-
-async function getFan2Speed() {
-	try {
-		console.log('getFan2Speed() :: getFan2Speed');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x02 ], resolve, reject));
-		await new Promise(resolve => setTimeout(resolve, globalDelay));
-	}
-	catch (getFan2SpeedError) {
-		console.log('getFan2Speed() :: getFan2SpeedError');
-		console.dir(getFan2SpeedError, { depth : null, showHidden : true });
-		await term();
-		process.exit(2);
-	}
-} // async getFan2Speed()
+} // async getFanSpeed()
 
 
 async function getPumpMode() {
 	try {
-		console.log('getPumpMode()        :: getPumpModeStep0');
+		// console.log('getPumpMode()        :: getPumpModeStep0');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0x33 ], resolve, reject));
 		await new Promise(resolve => setTimeout(resolve, globalDelay));
 	}
@@ -137,12 +100,12 @@ async function getPumpMode() {
 
 async function getPumpSpeed() {
 	try {
-		console.log('getPumpSpeed() :: getPumpSpeed');
+		// console.log('getPumpSpeed()       :: getPumpSpeed');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0x31 ], resolve, reject));
 		await new Promise(resolve => setTimeout(resolve, globalDelay));
 	}
 	catch (getPumpSpeedError) {
-		console.log('getPumpSpeed() :: getPumpSpeedError');
+		console.log('getPumpSpeed()       :: getPumpSpeedError');
 		console.dir(getPumpSpeedError, { depth : null, showHidden : true });
 		await term();
 		process.exit(2);
@@ -152,12 +115,12 @@ async function getPumpSpeed() {
 
 async function getTemperature() {
 	try {
-		console.log('getTemperature() :: getTemperature');
+		// console.log('getTemperature()     :: getTemperature');
 		await new Promise((resolve, reject) => endpointOut.transfer([ 0xA9 ], resolve, reject));
 		await new Promise(resolve => setTimeout(resolve, globalDelay));
 	}
 	catch (getTemperatureError) {
-		console.log('getTemperature() :: getTemperatureError');
+		console.log('getTemperature()     :: getTemperatureError');
 		console.dir(getTemperatureError, { depth : null, showHidden : true });
 		await term();
 		process.exit(2);
@@ -165,19 +128,32 @@ async function getTemperature() {
 } // async getTemperature()
 
 
+async function getInfo() {
+	if (shuttingDown !== false) return;
+
+	// console.log('getInfo()            :: begin');
+
+	await getFirmwareVersion();
+	await getHardwareVersion();
+
+	return true;
+} // async getInfo()
+
 async function getData() {
 	if (shuttingDown !== false) return;
 
-	console.log('getData()            :: begin');
+	// console.log('getData()            :: begin');
 
-	await getFan0Speed();
-	await getFan1Speed();
-	await getFan2Speed();
+	await getFanSpeed(0);
+	await getFanSpeed(1);
+	await getFanSpeed(2);
+
 	await getPumpMode();
 	await getPumpSpeed();
+
 	await getTemperature();
 
-	console.log('getData()            :: status: %s', JSON.stringify(status, null, 2));
+	console.log('getData()            :: status: %s', JSON.stringify(status));
 
 	await updatePumpMode();
 
@@ -186,28 +162,32 @@ async function getData() {
 
 
 async function updatePumpMode() {
-	if (typeof status.pumpMode !== 'string' || status.pumpMode === '' || status.pumpMode === null) {
-		console.log('updatePumpMode() :: missing pumpMode');
+	if (typeof status.data.pumpMode !== 'string' || status.data.pumpMode === '' || status.data.pumpMode === null) {
+		console.log('updatePumpMode()     :: missing pumpMode');
 		return;
 	}
 
-	if (typeof status.temperature !== 'number' || status.temperature === 0 || status.temperature === null) {
-		console.log('updatePumpMode() :: missing temperature');
+	if (typeof status.data.temperature !== 'number' || status.data.temperature === 0 || status.data.temperature === null) {
+		console.log('updatePumpMode()     :: missing temperature');
 		return;
 	}
 
 
 	let pumpModeTarget = 'performance';
-	if (status.temperature < 27) {
+	if (status.data.temperature < 27) {
 		pumpModeTarget = 'quiet';
 	}
-	else if (status.temperature < 29) {
+	else if (status.data.temperature < 29) {
 		pumpModeTarget = 'balanced';
 	}
 
-	if (status.pumpMode === pumpModeTarget) return;
 
-	console.log('updatePumpMode() :: pumpModeTarget = \'%s\'', pumpModeTarget);
+	if (status.data.pumpMode === pumpModeTarget) {
+		// console.log('updatePumpMode()     :: correct mode %o already set', pumpModeTarget);
+		return;
+	}
+
+	console.log('updatePumpMode()     :: pumpModeTarget = %o', pumpModeTarget);
 
 	await setPumpMode(pumpModeTarget);
 } // async updatePumpMode()
@@ -238,7 +218,6 @@ async function setPumpMode(newPumpMode) {
 
 function handleResponse(data) {
 	let packetType;
-
 	switch (data[0]) {
 		case 0x31 : packetType = 'pumpSpeed';   break;
 		case 0x32 : packetType = 'setPumpMode'; break;
@@ -248,16 +227,15 @@ function handleResponse(data) {
 			packetType = 'fan' + data[3].toString() + 'Speed';
 			break;
 
-		case 0xA9 : packetType = 'temperature';     break;
-		case 0xAA : packetType = 'firmwareVersion'; break;
-		case 0xAB : packetType = 'hardwareVersion'; break;
+		case 0xA9 : packetType = 'temperature'; break;
+
+		case 0xAA : packetType = 'firmware'; break;
+		case 0xAB : packetType = 'hardware'; break;
 
 		default : packetType = 'unknown';
 	}
 
-
 	let packetValue;
-
 	switch (data[0]) {
 		case 0x31 : packetValue = data.readInt16BE(3); break;
 
@@ -276,18 +254,38 @@ function handleResponse(data) {
 		case 0xA9 : packetValue = data[3] + (data[4] / 10); break;
 
 		case 0xAA :	packetValue = data[3] + '.' + data[4] + '.' + data[5] + '.' + data[6]; break;
-
 		case 0xAB :	packetValue = data[3]; break;
 
 		default : packetValue = null;
 	}
 
 
-	const packet = { packetType, packetValue };
-	console.log('hndlRes()            :: data: %o', data);
-	console.log('hndlRes()            :: packet: %s', JSON.stringify(packet, null, 2));
+	let packetClass;
+	switch (data[0]) {
+		case 0x31 :
+		case 0x32 :
+		case 0x33 :
+		case 0x41 :
+		case 0xA9 : {
+			packetClass = 'data';
+			break;
+		}
 
-	status[packetType] = packetValue;
+		case 0xAA :
+		case 0xAB : {
+			packetClass = 'version';
+			break;
+		}
+
+		default : packetClass = 'unknown';
+	}
+
+
+	// const packet = { packetClass, packetType, packetValue };
+	// console.log('handleResponse()     :: data: %o', data);
+	// console.log('handleResponse()     :: packet: %s', JSON.stringify(packet));
+
+	status[packetClass][packetType] = packetValue;
 } // handleResponse(data)
 
 async function init() {
@@ -295,9 +293,9 @@ async function init() {
 
 	if (deviceStatus.open === false) {
 		try {
-			console.log('init()               :: device open start');
+			// console.log('init()               :: device open start');
 			await device.open();
-			console.log('init()               :: device open end');
+			// console.log('init()               :: device open end');
 		}
 		catch (deviceOpenError) {
 			console.log('init()               :: deviceOpenError');
@@ -322,9 +320,9 @@ async function init() {
 		// const ctrlTransferData = Buffer.from([ 0x02 ]);
 		const ctrlTransferData = Buffer.alloc(0);
 
-		console.log('init()               :: device controlTransfer start');
+		// console.log('init()               :: device controlTransfer start');
 		await new Promise((resolve, reject) => device.controlTransfer(bmRequestType, bRequest, wValue, wIndex, ctrlTransferData, resolve, reject));
-		console.log('init()               :: device controlTransfer end');
+		// console.log('init()               :: device controlTransfer end');
 	}
 	catch (deviceControlTransferError) {
 		console.log('init()               :: deviceControlTransferError');
@@ -337,9 +335,9 @@ async function init() {
 
 
 	try {
-		console.log('init()               :: device reset start');
+		// console.log('init()               :: device reset start');
 		await new Promise((resolve, reject) => device.reset(resolve, reject));
-		console.log('init()               :: device reset end');
+		// console.log('init()               :: device reset end');
 	}
 	catch (deviceResetError) {
 		console.log('init()               :: deviceResetError');
@@ -356,9 +354,9 @@ async function init() {
 
 	if (deviceStatus.claimed === false) {
 		try {
-			console.log('init()               :: deviceInterface claim start');
+			// console.log('init()               :: deviceInterface claim start');
 			await deviceInterface.claim();
-			console.log('init()               :: deviceInterface claim end');
+			// console.log('init()               :: deviceInterface claim end');
 		}
 		catch (deviceInterfaceClaimError) {
 			console.log('init()               :: deviceInterfaceClaimError');
@@ -383,9 +381,9 @@ async function init() {
 
 
 	try {
-		console.log('init()               :: endpointIn clearHalt start');
+		// console.log('init()               :: endpointIn clearHalt start');
 		await new Promise((resolve, reject) => endpointIn.clearHalt(resolve, reject));
-		console.log('init()               :: endpointIn clearHalt end');
+		// console.log('init()               :: endpointIn clearHalt end');
 	}
 	catch (endpointInClearHaltError) {
 		console.log('init()               :: endpointInClearHaltError');
@@ -398,9 +396,9 @@ async function init() {
 
 
 	try {
-		console.log('init()               :: endpointOut clearHalt start');
+		// console.log('init()               :: endpointOut clearHalt start');
 		await new Promise((resolve, reject) => endpointOut.clearHalt(resolve, reject));
-		console.log('init()               :: endpointOut clearHalt end');
+		// console.log('init()               :: endpointOut clearHalt end');
 	}
 	catch (endpointOutClearHaltError) {
 		console.log('init()               :: endpointOutClearHaltError');
@@ -432,9 +430,9 @@ async function init() {
 
 	if (deviceStatus.polling === false) {
 		try {
-			console.log('init()               :: endpointIn polling start begin');
+			// console.log('init()               :: endpointIn polling start begin');
 			await endpointIn.startPoll(1, 10);
-			console.log('init()               :: endpointIn polling start end');
+			// console.log('init()               :: endpointIn polling start end');
 		}
 		catch (endpointInStartPollError) {
 			console.log('init()               :: endpointInStartPollError');
@@ -479,8 +477,6 @@ async function term(exitCode = 0) {
 	// Wait for globalTimeout ms for any last bytes to come through
 	await new Promise(resolve => setTimeout(resolve, globalTimeout));
 
-	console.log('term()               :: start');
-
 	if (typeof endpointIn !== 'undefined') {
 		endpointIn.removeAllListeners('data');
 		endpointIn.removeAllListeners('error');
@@ -492,9 +488,9 @@ async function term(exitCode = 0) {
 
 	if (deviceStatus.polling === true) {
 		try {
-			console.log('term()               :: endpointIn polling stop begin');
+			// console.log('term()               :: endpointIn polling stop begin');
 			await new Promise(resolve => endpointIn.stopPoll(resolve));
-			console.log('term()               :: endpointIn polling stop end');
+			// console.log('term()               :: endpointIn polling stop end');
 		}
 		catch (endpointInStopPollError) {
 			console.log('term()               :: endpointInStopPollError');
@@ -510,9 +506,9 @@ async function term(exitCode = 0) {
 
 	if (deviceStatus.claimed === true) {
 		try {
-			console.log('term()               :: deviceInterface release begin');
+			// console.log('term()               :: deviceInterface release begin');
 			await new Promise(resolve => deviceInterface.release(true, resolve));
-			console.log('term()               :: deviceInterface release end');
+			// console.log('term()               :: deviceInterface release end');
 		}
 		catch (deviceInterfaceReleaseError) {
 			console.log('term()               :: deviceInterfaceReleaseError');
@@ -528,9 +524,9 @@ async function term(exitCode = 0) {
 
 	if (deviceStatus.open === true) {
 		try {
-			console.log('term()               :: device close begin');
+			// console.log('term()               :: device close begin');
 			await device.close();
-			console.log('term()               :: device close end');
+			// console.log('term()               :: device close end');
 		}
 		catch (deviceCloseError) {
 			console.log('term()               :: deviceCloseError');
@@ -553,7 +549,6 @@ async function term(exitCode = 0) {
 	await getInfo();
 	await getData();
 
-	await term();
-
-	// intervalGetData = setInterval(getData, 500);
+	intervalGetData = setInterval(getData, 2000);
+	// await term();
 })();
