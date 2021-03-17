@@ -1,3 +1,5 @@
+/* eslint-disable no-unused-vars */
+
 const usb = require('usb');
 
 
@@ -12,6 +14,13 @@ const deviceStatus = {
 };
 
 const status = {
+	command : {
+		setFanSpeedPwm : null,
+		setFanSpeedRpm : null,
+
+		setPumpMode : null,
+	},
+
 	data : {
 		fan0Speed : null,
 		fan1Speed : null,
@@ -19,8 +28,6 @@ const status = {
 
 		pumpMode  : null,
 		pumpSpeed : null,
-
-		setPumpMode : null,
 
 		temperature : null,
 	},
@@ -72,6 +79,21 @@ async function getHardwareVersion() {
 } // async getHardwareVersion()
 
 
+async function getTemperature() {
+	try {
+		// console.log('getTemperature()     :: getTemperature');
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0xA9 ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (getTemperatureError) {
+		console.log('getTemperature()     :: getTemperatureError');
+		console.dir(getTemperatureError, { depth : null, showHidden : true });
+		await term();
+		process.exit(2);
+	}
+} // async getTemperature()
+
+
 async function getFanSpeed(fanId) {
 	try {
 		// console.log('getFanSpeed(%o)       :: getFanSpeed', fanId);
@@ -84,6 +106,53 @@ async function getFanSpeed(fanId) {
 		await term(2);
 	}
 } // async getFanSpeed()
+
+async function setFanSpeedPwm(fanId, pwmValue) {
+	try {
+		// console.log('setFanSpeedPwm(%o)       :: setFanSpeedPwm', fanId);
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0x42, fanId, pwmValue ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (setFanSpeedPwmError) {
+		console.log('setFanSpeedPwm(%o)       :: setFanSpeedPwmError', fanId);
+		console.dir(setFanSpeedPwmError, { depth : null, showHidden : true });
+		await term(2);
+	}
+} // async setFanSpeedPwm()
+
+async function setFanSpeedRpm(fanId, rpmValue) {
+	try {
+		// console.log('setFanSpeedRpm(%o)       :: setFanSpeedRpm', fanId);
+		const transferBuffer = Buffer.alloc(4);
+		transferBuffer.writeUInt8(0x43, 0);
+		transferBuffer.writeUInt8(fanId, 1);
+		transferBuffer.writeUint16BE(rpmValue, 2);
+
+		await new Promise((resolve, reject) => endpointOut.transfer(transferBuffer, resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (setFanSpeedRpmError) {
+		console.log('setFanSpeedRpm(%o)       :: setFanSpeedRpmError', fanId);
+		console.dir(setFanSpeedRpmError, { depth : null, showHidden : true });
+		await term(2);
+	}
+} // async setFanSpeedRpm()
+
+
+async function setFanSpeedCustomCurve(fanId, tempValues, pwmValues) {
+	try {
+		// console.log('setFanSpeedCustomCurve(%o)       :: setFanSpeedCustomCurve %o %o', fanId, tempValues, pwmValues);
+		const transferBuffer = Buffer.from([ 0x40, fanId, ...tempValues, ...pwmValues ]);
+
+		await new Promise((resolve, reject) => endpointOut.transfer(transferBuffer, resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (setFanSpeedCustomCurveError) {
+		console.log('setFanSpeedCustomCurve(%o)       :: setFanSpeedCustomCurveError', fanId);
+		console.dir(setFanSpeedCustomCurveError, { depth : null, showHidden : true });
+		await term(2);
+	}
+} // async setFanSpeedCustomCurve()
 
 
 async function getPumpMode() {
@@ -114,20 +183,59 @@ async function getPumpSpeed() {
 	}
 } // async getPumpSpeed()
 
+async function setPumpMode(newPumpMode) {
+	let newPumpModeId;
+	switch (newPumpMode) {
+		case 'quiet'       : newPumpModeId = 0x00; break;
+		case 'balanced'    : newPumpModeId = 0x01; break;
+		case 'performance' : newPumpModeId = 0x02; break;
 
-async function getTemperature() {
+		default : newPumpModeId = 0x02; // performance by default
+	}
+
 	try {
-		// console.log('getTemperature()     :: getTemperature');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0xA9 ], resolve, reject));
+		console.log('setPumpMode()        :: setting pumpMode %o, pumpModeId %o', newPumpMode, newPumpModeId);
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0x32, newPumpModeId ], resolve, reject));
 		await new Promise(resolve => setTimeout(resolve, globalDelay));
+		await getPumpMode();
 	}
-	catch (getTemperatureError) {
-		console.log('getTemperature()     :: getTemperatureError');
-		console.dir(getTemperatureError, { depth : null, showHidden : true });
-		await term();
-		process.exit(2);
+	catch (setPumpModeError) {
+		console.log('setPumpMode()        :: setPumpModeError');
+		console.dir(setPumpModeError, { depth : null, showHidden : true });
+		await term(10);
 	}
-} // async getTemperature()
+} // async setPumpMode(newPumpMode)
+
+async function updatePumpMode() {
+	if (typeof status.data.pumpMode !== 'string' || status.data.pumpMode === '' || status.data.pumpMode === null) {
+		console.log('updatePumpMode()     :: missing pumpMode');
+		return;
+	}
+
+	if (typeof status.data.temperature !== 'number' || status.data.temperature === 0 || status.data.temperature === null) {
+		console.log('updatePumpMode()     :: missing temperature');
+		return;
+	}
+
+
+	let pumpModeTarget = 'performance';
+	if (status.data.temperature < 33) {
+		pumpModeTarget = 'quiet';
+	}
+	else if (status.data.temperature < 34) {
+		pumpModeTarget = 'balanced';
+	}
+
+
+	if (status.data.pumpMode === pumpModeTarget) {
+		// console.log('updatePumpMode()     :: correct mode %o already set', pumpModeTarget);
+		return;
+	}
+
+	console.log('updatePumpMode()     :: pumpModeTarget = %o', pumpModeTarget);
+
+	await setPumpMode(pumpModeTarget);
+} // async updatePumpMode()
 
 
 async function getInfo() {
@@ -163,71 +271,22 @@ async function getData() {
 } // async getData()
 
 
-async function updatePumpMode() {
-	if (typeof status.data.pumpMode !== 'string' || status.data.pumpMode === '' || status.data.pumpMode === null) {
-		console.log('updatePumpMode()     :: missing pumpMode');
-		return;
-	}
-
-	if (typeof status.data.temperature !== 'number' || status.data.temperature === 0 || status.data.temperature === null) {
-		console.log('updatePumpMode()     :: missing temperature');
-		return;
-	}
-
-
-	let pumpModeTarget = 'performance';
-	if (status.data.temperature < 33) {
-		pumpModeTarget = 'quiet';
-	}
-	else if (status.data.temperature < 34) {
-		pumpModeTarget = 'balanced';
-	}
-
-
-	if (status.data.pumpMode === pumpModeTarget) {
-		// console.log('updatePumpMode()     :: correct mode %o already set', pumpModeTarget);
-		return;
-	}
-
-	console.log('updatePumpMode()     :: pumpModeTarget = %o', pumpModeTarget);
-
-	await setPumpMode(pumpModeTarget);
-} // async updatePumpMode()
-
-async function setPumpMode(newPumpMode) {
-	let newPumpModeId;
-	switch (newPumpMode) {
-		case 'quiet'       : newPumpModeId = 0x00; break;
-		case 'balanced'    : newPumpModeId = 0x01; break;
-		case 'performance' : newPumpModeId = 0x02; break;
-
-		default : newPumpModeId = 0x02; // performance by default
-	}
-
-	try {
-		console.log('setPumpMode()        :: setting pumpMode %o, pumpModeId %o', newPumpMode, newPumpModeId);
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0x32, newPumpModeId ], resolve, reject));
-		await new Promise(resolve => setTimeout(resolve, globalDelay));
-		await getPumpMode();
-	}
-	catch (setPumpModeError) {
-		console.log('setPumpMode()        :: setPumpModeError');
-		console.dir(setPumpModeError, { depth : null, showHidden : true });
-		await term(10);
-	}
-} // async setPumpMode(newPumpMode)
-
-
 function handleResponse(data) {
+	console.log('handleResponse()     :: data: %o', data);
+
+
 	let packetType;
 	switch (data[0]) {
-		case 0x31 : packetType = 'pumpSpeed';   break;
-		case 0x32 : packetType = 'setPumpMode'; break;
-		case 0x33 : packetType = 'pumpMode';    break;
+		case 0x31 : packetType = 'pumpSpeed'; break;
+		case 0x33 : packetType = 'pumpMode';  break;
 
-		case 0x41 :
-			packetType = 'fan' + data[3].toString() + 'Speed';
-			break;
+		case 0x41 :	packetType = 'fan' + data[3].toString() + 'Speed'; break;
+
+		case 0x32 : packetType = 'setPumpMode';    break;
+		case 0x42 : packetType = 'setFanSpeedPwm'; break;
+		case 0x43 : packetType = 'setFanSpeedRpm'; break;
+
+		case 0x8F : packetType = 'somethingsBroken'; break;
 
 		case 0xA9 : packetType = 'temperature'; break;
 
@@ -241,7 +300,6 @@ function handleResponse(data) {
 	switch (data[0]) {
 		case 0x31 : packetValue = data.readInt16BE(3); break;
 
-		case 0x32 : packetValue = Boolean(data[1] === 0x12 && data[2] === 0x34); break;
 
 		case 0x33 :
 			switch (data[3]) {
@@ -252,6 +310,10 @@ function handleResponse(data) {
 			break;
 
 		case 0x41 : packetValue = data.readInt16BE(4); break;
+
+		case 0x32 :
+		case 0x42 :
+		case 0x43 : packetValue = Boolean(data[1] === 0x12 && data[2] === 0x34); break;
 
 		case 0xA9 : packetValue = data[3] + (data[4] / 10); break;
 
@@ -265,11 +327,17 @@ function handleResponse(data) {
 	let packetClass;
 	switch (data[0]) {
 		case 0x31 :
-		case 0x32 :
 		case 0x33 :
 		case 0x41 :
 		case 0xA9 : {
 			packetClass = 'data';
+			break;
+		}
+
+		case 0x32 :
+		case 0x42 :
+		case 0x43 : {
+			packetClass = 'command';
 			break;
 		}
 
@@ -284,7 +352,6 @@ function handleResponse(data) {
 
 
 	// const packet = { packetClass, packetType, packetValue };
-	// console.log('handleResponse()     :: data: %o', data);
 	// console.log('handleResponse()     :: packet: %s', JSON.stringify(packet));
 
 	status[packetClass][packetType] = packetValue;
@@ -548,9 +615,13 @@ async function term(exitCode = 0) {
 (async () => {
 	await termConfig();
 	await init();
-	await getInfo();
-	await getData();
 
-	intervalGetData = setInterval(getData, 2000);
-	// await term();
+	await setFanSpeedRpm(0, 700);
+	await setFanSpeedRpm(1, 700);
+	await setFanSpeedRpm(2, 700);
+	await getData();
+	await getInfo();
+
+	// intervalGetData = setInterval(getData, 2000);
+	await term();
 })();
