@@ -8,6 +8,9 @@ let endpointOut;
 
 let shuttingDown = false;
 
+const globalDelay   = 50;
+const globalTimeout = 500;
+
 const deviceStatus = {
 	claimed : false,
 	open    : false,
@@ -19,9 +22,9 @@ let intervalGetData;
 
 
 const status = {
+	fan0Speed : null,
 	fan1Speed : null,
 	fan2Speed : null,
-	fan3Speed : null,
 
 	firmwareVersion : null,
 	hardwareVersion : null,
@@ -35,6 +38,204 @@ const status = {
 };
 
 
+async function getFirmwareVersion() {
+	try {
+		console.log('getFirmwareVersion() :: getFirmwareVersionStep0');
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0xAA ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (getFirmwareVersionStep0Error) {
+		console.log('getFirmwareVersion() :: getFirmwareVersionStep0Error');
+		console.dir(getFirmwareVersionStep0Error, { depth : null, showHidden : true });
+		await term();
+		process.exit(2);
+	}
+} // async getFirmwareVersion()
+
+async function getHardwareVersion() {
+	try {
+		console.log('getHardwareVersion() :: getHardwareVersionStep0');
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0xAB ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (getHardwareVersionStep0Error) {
+		console.log('getHardwareVersion() :: getHardwareVersionStep0Error');
+		console.dir(getHardwareVersionStep0Error, { depth : null, showHidden : true });
+		await term();
+		process.exit(2);
+	}
+} // async getHardwareVersion()
+
+async function getInfo() {
+	if (shuttingDown !== false) return;
+
+	console.log('getInfo()            :: begin');
+
+	await getFirmwareVersion();
+	await getHardwareVersion();
+
+	return true;
+} // async getInfo()
+
+
+async function getFan0Speed() {
+	try {
+		console.log('getFan0Speed() :: getFan0Speed');
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x00 ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (getFan0SpeedError) {
+		console.log('getFan0Speed() :: getFan0SpeedError');
+		console.dir(getFan0SpeedError, { depth : null, showHidden : true });
+		await term();
+		process.exit(2);
+	}
+} // async getFan0Speed()
+
+async function getFan1Speed() {
+	try {
+		console.log('getFan1Speed() :: getFan1Speed');
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x01 ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (getFan1SpeedError) {
+		console.log('getFan1Speed() :: getFan1SpeedError');
+		console.dir(getFan1SpeedError, { depth : null, showHidden : true });
+		await term();
+		process.exit(2);
+	}
+} // async getFan1Speed()
+
+async function getFan2Speed() {
+	try {
+		console.log('getFan2Speed() :: getFan2Speed');
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x02 ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (getFan2SpeedError) {
+		console.log('getFan2Speed() :: getFan2SpeedError');
+		console.dir(getFan2SpeedError, { depth : null, showHidden : true });
+		await term();
+		process.exit(2);
+	}
+} // async getFan2Speed()
+
+
+async function getPumpMode() {
+	try {
+		console.log('getPumpMode()        :: getPumpModeStep0');
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0x33 ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (getPumpModeStep0Error) {
+		console.log('getPumpMode()        :: getPumpModeStep0Error');
+		console.dir(getPumpModeStep0Error, { depth : null, showHidden : true });
+		await term();
+		process.exit(2);
+	}
+} // async getPumpMode()
+
+async function getPumpSpeed() {
+	try {
+		console.log('getPumpSpeed() :: getPumpSpeed');
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0x31 ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (getPumpSpeedError) {
+		console.log('getPumpSpeed() :: getPumpSpeedError');
+		console.dir(getPumpSpeedError, { depth : null, showHidden : true });
+		await term();
+		process.exit(2);
+	}
+} // async getPumpSpeed()
+
+
+async function getTemperature() {
+	try {
+		console.log('getTemperature() :: getTemperature');
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0xA9 ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+	}
+	catch (getTemperatureError) {
+		console.log('getTemperature() :: getTemperatureError');
+		console.dir(getTemperatureError, { depth : null, showHidden : true });
+		await term();
+		process.exit(2);
+	}
+} // async getTemperature()
+
+
+async function getData() {
+	if (shuttingDown !== false) return;
+
+	console.log('getData()            :: begin');
+
+	await getFan0Speed();
+	await getFan1Speed();
+	await getFan2Speed();
+	await getPumpMode();
+	await getPumpSpeed();
+	await getTemperature();
+
+	console.log('getData()            :: status: %s', JSON.stringify(status, null, 2));
+
+	await updatePumpMode();
+
+	return true;
+} // async getData()
+
+
+async function updatePumpMode() {
+	if (typeof status.pumpMode !== 'string' || status.pumpMode === '' || status.pumpMode === null) {
+		console.log('updatePumpMode() :: missing pumpMode');
+		return;
+	}
+
+	if (typeof status.temperature !== 'number' || status.temperature === 0 || status.temperature === null) {
+		console.log('updatePumpMode() :: missing temperature');
+		return;
+	}
+
+
+	let pumpModeTarget = 'performance';
+	if (status.temperature < 27) {
+		pumpModeTarget = 'quiet';
+	}
+	else if (status.temperature < 29) {
+		pumpModeTarget = 'balanced';
+	}
+
+	if (status.pumpMode === pumpModeTarget) return;
+
+	console.log('updatePumpMode() :: pumpModeTarget = \'%s\'', pumpModeTarget);
+
+	await setPumpMode(pumpModeTarget);
+} // async updatePumpMode()
+
+async function setPumpMode(newPumpMode) {
+	let newPumpModeId;
+	switch (newPumpMode) {
+		case 'quiet'       : newPumpModeId = 0x00; break;
+		case 'balanced'    : newPumpModeId = 0x01; break;
+		case 'performance' : newPumpModeId = 0x02; break;
+
+		default : newPumpModeId = 0x02; // performance by default
+	}
+
+	try {
+		console.log('setPumpMode()            :: setting pumpMode %s, pumpModeId %o', newPumpMode, newPumpModeId);
+		await new Promise((resolve, reject) => endpointOut.transfer([ 0x32, newPumpModeId ], resolve, reject));
+		await new Promise(resolve => setTimeout(resolve, globalDelay));
+		await getPumpMode();
+	}
+	catch (setPumpModeError) {
+		console.log('setPumpMode()            :: setPumpModeError');
+		console.dir(setPumpModeError, { depth : null, showHidden : true });
+		await term(10);
+	}
+} // async setPumpMode(newPumpMode)
+
+
 function handleResponse(data) {
 	let packetType;
 
@@ -44,11 +245,7 @@ function handleResponse(data) {
 		case 0x33 : packetType = 'pumpMode';    break;
 
 		case 0x41 :
-			switch (data[3]) {
-				case 0x00 : packetType = 'fan1Speed'; break;
-				case 0x01 : packetType = 'fan2Speed'; break;
-				case 0x02 : packetType = 'fan3Speed'; break;
-			}
+			packetType = 'fan' + data[3].toString() + 'Speed';
 			break;
 
 		case 0xA9 : packetType = 'temperature';     break;
@@ -87,175 +284,171 @@ function handleResponse(data) {
 
 
 	const packet = { packetType, packetValue };
-	console.log('hndlRes()        :: data: %o', data);
-	console.log('hndlRes()        :: packet: %s', JSON.stringify(packet, null, 2));
+	console.log('hndlRes()            :: data: %o', data);
+	console.log('hndlRes()            :: packet: %s', JSON.stringify(packet, null, 2));
 
 	status[packetType] = packetValue;
 } // handleResponse(data)
 
+async function init() {
+	device = await usb.findByIds(0x1B1C, 0x0C12);
 
-async function getPumpMode() {
+	if (deviceStatus.open === false) {
+		try {
+			console.log('init()               :: device open start');
+			await device.open();
+			console.log('init()               :: device open end');
+		}
+		catch (deviceOpenError) {
+			console.log('init()               :: deviceOpenError');
+			console.dir(deviceOpenError, { depth : null, showHidden : true });
+			await term();
+			process.exit(11);
+		}
+
+		console.log('init()               :: device open OK');
+		deviceStatus.open = true;
+	}
+
+
+	// Set the software clear-to-send flow control policy for device
+	// https://github.com/liquidctl/liquidctl/blob/c38387063b986f21820c7ea695b63265577594ff/liquidctl/driver/asetek.py#L84
 	try {
-		console.log('getPumpMode()    :: getPumpModeStep0');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0x33 ], resolve, reject));
+		const bmRequestType = usb.LIBUSB_ENDPOINT_OUT | usb.LIBUSB_REQUEST_TYPE_VENDOR | usb.LIBUSB_RECIPIENT_DEVICE;
+		const bRequest      = 0x02;
+		const wValue        = 0x00;
+		const wIndex        = 0x00;
+
+		// const ctrlTransferData = Buffer.from([ 0x02 ]);
+		const ctrlTransferData = Buffer.alloc(0);
+
+		console.log('init()               :: device controlTransfer start');
+		await new Promise((resolve, reject) => device.controlTransfer(bmRequestType, bRequest, wValue, wIndex, ctrlTransferData, resolve, reject));
+		console.log('init()               :: device controlTransfer end');
 	}
-	catch (getPumpModeStep0Error) {
-		console.log('getPumpMode()    :: getPumpModeStep0Error');
-		console.dir(getPumpModeStep0Error, { depth : null, showHidden : true });
+	catch (deviceControlTransferError) {
+		console.log('init()               :: deviceControlTransferError');
+		console.dir(deviceControlTransferError, { depth : null, showHidden : true });
 		await term();
-		process.exit(2);
+		process.exit(12);
 	}
-} // async getPumpMode()
 
+	console.log('init()               :: device controlTransfer OK');
 
-async function getInfo() {
-	if (shuttingDown !== false) return;
 
 	try {
-		console.log('getInfo()        :: getInfoStep0');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0xAA ], resolve, reject));
+		console.log('init()               :: device reset start');
+		await new Promise((resolve, reject) => device.reset(resolve, reject));
+		console.log('init()               :: device reset end');
 	}
-	catch (getInfoStep0Error) {
-		console.log('getInfo()        :: getInfoStep0Error');
-		console.dir(getInfoStep0Error, { depth : null, showHidden : true });
+	catch (deviceResetError) {
+		console.log('init()               :: deviceResetError');
+		console.dir(deviceResetError, { depth : null, showHidden : true });
 		await term();
-		process.exit(3);
+		process.exit(12);
 	}
 
-	try {
-		console.log('getInfo()        :: getInfoStep1');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0xAB ], resolve, reject));
+	console.log('init()               :: device reset OK');
+
+
+	deviceInterface = device.interface(0);
+
+
+	if (deviceStatus.claimed === false) {
+		try {
+			console.log('init()               :: deviceInterface claim start');
+			await deviceInterface.claim();
+			console.log('init()               :: deviceInterface claim end');
+		}
+		catch (deviceInterfaceClaimError) {
+			console.log('init()               :: deviceInterfaceClaimError');
+			console.dir({ deviceStatus });
+			console.dir(deviceInterfaceClaimError, { depth : null, showHidden : true });
+			await term();
+			process.exit(12);
+		}
+
+		console.log('init()               :: deviceInterface claim OK');
+		deviceStatus.claimed = true;
 	}
-	catch (getInfoStep1Error) {
-		console.log('getInfo()        :: getInfoStep1Error');
-		console.dir(getInfoStep1Error, { depth : null, showHidden : true });
+
+
+	endpointIn  = deviceInterface.endpoints[0];
+	endpointOut = deviceInterface.endpoints[1];
+
+
+	// Set endpoint transfer timeout
+	endpointIn.timeout  = globalTimeout;
+	endpointOut.timeout = globalTimeout;
+
+
+	try {
+		console.log('init()               :: endpointIn clearHalt start');
+		await new Promise((resolve, reject) => endpointIn.clearHalt(resolve, reject));
+		console.log('init()               :: endpointIn clearHalt end');
+	}
+	catch (endpointInClearHaltError) {
+		console.log('init()               :: endpointInClearHaltError');
+		console.dir(endpointInClearHaltError, { depth : null, showHidden : true });
 		await term();
-		process.exit(4);
+		process.exit(12);
+	}
+
+	console.log('init()               :: endpointIn clearHalt OK');
+
+
+	try {
+		console.log('init()               :: endpointOut clearHalt start');
+		await new Promise((resolve, reject) => endpointOut.clearHalt(resolve, reject));
+		console.log('init()               :: endpointOut clearHalt end');
+	}
+	catch (endpointOutClearHaltError) {
+		console.log('init()               :: endpointOutClearHaltError');
+		console.dir(endpointOutClearHaltError, { depth : null, showHidden : true });
+		await term();
+		process.exit(12);
+	}
+
+	console.log('init()               :: endpointOut clearHalt OK');
+
+
+	// Configure endpoint event listeners
+	endpointIn.on('data', handleResponse);
+
+	endpointIn.on('error', async endpointInError => {
+		console.log('dataIn()             :: endpointInError');
+		console.dir(endpointInError, { depth : null, showHidden : true });
+		await term();
+		process.exit(13);
+	});
+
+	endpointOut.on('error', async endpointOutError => {
+		console.log('dataOut()             :: endpointOutError');
+		console.dir(endpointOutError, { depth : null, showHidden : true });
+		await term();
+		process.exit(13);
+	});
+
+
+	if (deviceStatus.polling === false) {
+		try {
+			console.log('init()               :: endpointIn polling start begin');
+			await endpointIn.startPoll(1, 10);
+			console.log('init()               :: endpointIn polling start end');
+		}
+		catch (endpointInStartPollError) {
+			console.log('init()               :: endpointInStartPollError');
+			console.dir(endpointInStartPollError, { depth : null, showHidden : true });
+			await term();
+			process.exit(14);
+		}
+
+		console.log('init()               :: endpointIn polling start OK');
+		deviceStatus.polling = true;
 	}
 
 	return true;
-} // async getInfo()
-
-async function getData() {
-	if (shuttingDown !== false) return;
-
-	// console.log('getData()        :: begin');
-
-	await getPumpMode();
-
-	try {
-		console.log('getData()        :: getDataStep0');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0xA9 ], resolve, reject));
-	}
-	catch (getDataStep0Error) {
-		console.log('getData()        :: getDataStep0Error');
-		console.dir(getDataStep0Error, { depth : null, showHidden : true });
-		await term();
-		process.exit(5);
-	}
-
-	try {
-		console.log('getData()        :: getDataStep1');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x00 ], resolve, reject));
-	}
-	catch (getDataStep1Error) {
-		console.log('getData()        :: getDataStep1Error');
-		console.dir(getDataStep1Error, { depth : null, showHidden : true });
-		await term();
-		process.exit(6);
-	}
-
-	try {
-		console.log('getData()        :: getDataStep2');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x01 ], resolve, reject));
-	}
-	catch (getDataStep2Error) {
-		console.log('getData()        :: getDataStep2Error');
-		console.dir(getDataStep2Error, { depth : null, showHidden : true });
-		await term();
-		process.exit(7);
-	}
-
-	try {
-		console.log('getData()        :: getDataStep3');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0x41, 0x02 ], resolve, reject));
-	}
-	catch (getDataStep3Error) {
-		console.log('getData()        :: getDataStep3Error');
-		console.dir(getDataStep3Error, { depth : null, showHidden : true });
-		await term();
-		process.exit(8);
-	}
-
-	try {
-		console.log('getData()        :: getDataStep4');
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0x31 ], resolve, reject));
-	}
-	catch (getDataStep4Error) {
-		console.log('getData()        :: getDataStep4Error');
-		console.dir(getDataStep4Error, { depth : null, showHidden : true });
-		await term();
-		process.exit(9);
-	}
-
-	console.log('getData()        :: status: %s', JSON.stringify(status, null, 2));
-
-	await updatePumpMode();
-
-	await term();
-
-	return true;
-} // async getData()
-
-
-async function updatePumpMode() {
-	if (typeof status.pumpMode !== 'string' || status.pumpMode === '' || status.pumpMode === null) {
-		console.log('updatePumpMode() :: missing pumpMode');
-		return;
-	}
-
-	if (typeof status.temperature !== 'number' || status.temperature === 0 || status.temperature === null) {
-		console.log('updatePumpMode() :: missing temperature');
-		return;
-	}
-
-
-	let pumpModeTarget = 'performance';
-	if (status.temperature < 27) {
-		pumpModeTarget = 'quiet';
-	}
-	else if (status.temperature < 29) {
-		pumpModeTarget = 'balanced';
-	}
-
-	if (status.pumpMode === pumpModeTarget) return;
-
-	console.log('updatePumpMode() :: pumpModeTarget = \'%s\'', pumpModeTarget);
-
-	await setPumpMode(pumpModeTarget);
-} // async updatePumpMode()
-
-async function setPumpMode(newPumpMode) {
-	let newPumpModeId = 0x02;
-	switch (newPumpMode) {
-		case 'quiet'       : newPumpModeId = 0x00; break;
-		case 'balanced'    : newPumpModeId = 0x01; break;
-		case 'performance' : newPumpModeId = 0x02;
-	}
-
-	try {
-		console.log('setPumpMode()        :: setting pumpMode %s, pumpModeId %o', newPumpMode, newPumpModeId);
-		await new Promise((resolve, reject) => endpointOut.transfer([ 0x32, newPumpModeId ], resolve, reject));
-		await getPumpMode();
-	}
-	catch (setPumpModeError) {
-		console.log('setPumpMode()        :: setPumpModeError');
-		console.dir(setPumpModeError, { depth : null, showHidden : true });
-		await term();
-		process.exit(10);
-	}
-} // async setPumpMode(newPumpMode)
-
+} // async init()
 
 // Configure term event listeners
 async function termConfig() {
@@ -282,113 +475,11 @@ async function termConfig() {
 	});
 } // async term_config()
 
-async function init() {
-	device = await usb.findByIds(0x1B1C, 0x0C12);
+async function term(exitCode = 0) {
+	// Wait for globalTimeout ms for any last bytes to come through
+	await new Promise(resolve => setTimeout(resolve, globalTimeout));
 
-	if (deviceStatus.open === false) {
-		try {
-			console.log('init()           :: device open start');
-			await device.open();
-			console.log('init()           :: device open end');
-		}
-		catch (deviceOpenError) {
-			console.log('init()           :: deviceOpenError');
-			console.dir(deviceOpenError, { depth : null, showHidden : true });
-			await term();
-			process.exit(11);
-		}
-
-		console.log('init()           :: device open OK');
-		deviceStatus.open = true;
-	}
-
-	try {
-		console.log('init()           :: device reset start');
-		await new Promise((resolve, reject) => device.reset(resolve, reject));
-		console.log('init()           :: device reset end');
-	}
-	catch (deviceResetError) {
-		console.log('init()           :: deviceResetError');
-		console.dir(deviceResetError, { depth : null, showHidden : true });
-		await term();
-		process.exit(12);
-	}
-
-	console.log('init()           :: device reset OK');
-
-
-	deviceInterface = device.interface(0);
-
-
-	if (deviceStatus.claimed === false) {
-		try {
-			console.log('init()           :: deviceInterface claim start');
-			await deviceInterface.claim();
-			console.log('init()           :: deviceInterface claim end');
-		}
-		catch (deviceInterfaceClaimError) {
-			console.log('init()           :: deviceInterfaceClaimError');
-			console.dir({ deviceStatus });
-			console.dir(deviceInterfaceClaimError, { depth : null, showHidden : true });
-			await term();
-			process.exit(12);
-		}
-
-		console.log('init()           :: deviceInterface claim OK');
-		deviceStatus.claimed = true;
-	}
-
-
-	endpointIn  = deviceInterface.endpoints[0];
-	endpointOut = deviceInterface.endpoints[1];
-
-	// console.dir({ endpointIn, endpointOut }, { depth : null, showHidden : true });
-
-	// Set endpoint transfer timeout
-	endpointIn.timeout  = 100;
-	endpointOut.timeout = 100;
-
-
-	// Configure endpoint event listeners
-	endpointIn.on('data', handleResponse);
-
-	endpointIn.on('error', async endpointInError => {
-		console.log('dataIn()         :: endpointInError');
-		console.dir(endpointInError, { depth : null, showHidden : true });
-		await term();
-		process.exit(13);
-	});
-
-	endpointOut.on('error', async endpointOutError => {
-		console.log('dataOut()         :: endpointOutError');
-		console.dir(endpointOutError, { depth : null, showHidden : true });
-		await term();
-		process.exit(13);
-	});
-
-
-	if (deviceStatus.polling === false) {
-		try {
-			console.log('init()           :: endpointIn polling start begin');
-			await endpointIn.startPoll();
-			console.log('init()           :: endpointIn polling start end');
-		}
-		catch (endpointInStartPollError) {
-			console.log('init()           :: endpointInStartPollError');
-			console.dir(endpointInStartPollError, { depth : null, showHidden : true });
-			await term();
-			process.exit(14);
-		}
-
-		console.log('init()           :: endpointIn polling start OK');
-		deviceStatus.polling = true;
-	}
-
-	return true;
-} // async init()
-
-async function term() {
-	console.log('term()           :: start');
+	console.log('term()               :: start');
 
 	if (typeof endpointIn !== 'undefined') {
 		endpointIn.removeAllListeners('data');
@@ -401,58 +492,58 @@ async function term() {
 
 	if (deviceStatus.polling === true) {
 		try {
-			console.log('term()           :: endpointIn polling stop begin');
+			console.log('term()               :: endpointIn polling stop begin');
 			await new Promise(resolve => endpointIn.stopPoll(resolve));
-			console.log('term()           :: endpointIn polling stop end');
+			console.log('term()               :: endpointIn polling stop end');
 		}
 		catch (endpointInStopPollError) {
-			console.log('term()           :: endpointInStopPollError');
+			console.log('term()               :: endpointInStopPollError');
 			console.dir({ deviceStatus });
 			console.dir(endpointInStopPollError, { depth : null, showHidden : true });
 			process.exit(15);
 		}
 
-		console.log('term()           :: endpointIn polling stop OK');
+		console.log('term()               :: endpointIn polling stop OK');
 		deviceStatus.polling = false;
 	}
 
 
 	if (deviceStatus.claimed === true) {
 		try {
-			console.log('term()           :: deviceInterface release begin');
+			console.log('term()               :: deviceInterface release begin');
 			await new Promise(resolve => deviceInterface.release(true, resolve));
-			console.log('term()           :: deviceInterface release end');
+			console.log('term()               :: deviceInterface release end');
 		}
 		catch (deviceInterfaceReleaseError) {
-			console.log('term()           :: deviceInterfaceReleaseError');
+			console.log('term()               :: deviceInterfaceReleaseError');
 			console.dir({ deviceStatus });
 			console.dir(deviceInterfaceReleaseError, { depth : null, showHidden : true });
 			process.exit(15);
 		}
 
-		console.log('term()           :: deviceInterface release OK');
+		console.log('term()               :: deviceInterface release OK');
 		deviceStatus.claimed = false;
 	}
 
 
 	if (deviceStatus.open === true) {
 		try {
-			console.log('term()           :: device close begin');
+			console.log('term()               :: device close begin');
 			await device.close();
-			console.log('term()           :: device close end');
+			console.log('term()               :: device close end');
 		}
 		catch (deviceCloseError) {
-			console.log('term()           :: deviceCloseError');
+			console.log('term()               :: deviceCloseError');
 			console.dir({ deviceStatus });
 			console.dir(deviceCloseError, { depth : null, showHidden : true });
 			process.exit(16);
 		}
 
-		console.log('term()           :: device close OK\n');
+		console.log('term()               :: device close OK\n');
 		deviceStatus.open = false;
 	}
 
-	return true;
+	process.exit(exitCode);
 } // async term()
 
 
@@ -461,6 +552,8 @@ async function term() {
 	await init();
 	await getInfo();
 	await getData();
+
+	await term();
 
 	// intervalGetData = setInterval(getData, 500);
 })();
