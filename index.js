@@ -219,10 +219,10 @@ async function updatePumpMode() {
 
 
 	let pumpModeTarget = 'performance';
-	if (status.data.temperature < 33) {
+	if (status.data.temperature < 27) {
 		pumpModeTarget = 'quiet';
 	}
-	else if (status.data.temperature < 34) {
+	else if (status.data.temperature < 29) {
 		pumpModeTarget = 'balanced';
 	}
 
@@ -272,7 +272,7 @@ async function getData() {
 
 
 function handleResponse(data) {
-	console.log('handleResponse()     :: data: %o', data);
+	// console.log('handleResponse()     :: data: %o', data);
 
 
 	let packetType;
@@ -616,12 +616,13 @@ async function term(exitCode = 0) {
 	await termConfig();
 	await init();
 
-	await setFanSpeedRpm(0, 700);
-	await setFanSpeedRpm(1, 700);
-	await setFanSpeedRpm(2, 700);
+	// await setFanSpeedRpm(0, 700);
+	// await setFanSpeedRpm(1, 700);
+	// await setFanSpeedRpm(2, 700);
+
 	await getData();
 	await getInfo();
 
-	// intervalGetData = setInterval(getData, 2000);
-	await term();
+	intervalGetData = setInterval(getData, 500);
+	// await term();
 })();
