@@ -2,6 +2,13 @@
 
 const usb = require('usb');
 
+const SerialPort = require('serialport');
+const Readline = require('@serialport/parser-readline');
+
+const parser = new Readline({ delimiter : '\r\n' });
+
+let port;
+
 
 const globalDelay   = 50;
 const globalTimeout = 500;
@@ -29,7 +36,7 @@ const status = {
 		pumpMode  : null,
 		pumpSpeed : null,
 
-		temperature : null,
+		temperature : 30,
 	},
 
 	version : {
@@ -48,6 +55,21 @@ let endpointOut;
 let intervalGetData;
 
 let shuttingDown = false;
+
+
+async function parseControllerData(data) {
+	try {
+		const parsedData = JSON.parse(data);
+
+		status.data.controller = parsedData;
+
+		// console.log({ parsedData });
+
+		port.write('#tmp' + status.data.temperature + '\n');
+	}
+	// eslint-disable-next-line no-empty
+	catch (e) {}
+} // async parseControllerData(data);
 
 
 async function getFirmwareVersion() {
@@ -219,10 +241,10 @@ async function updatePumpMode() {
 
 
 	let pumpModeTarget = 'performance';
-	if (status.data.temperature < 27) {
+	if (status.data.temperature < 29) {
 		pumpModeTarget = 'quiet';
 	}
-	else if (status.data.temperature < 29) {
+	else if (status.data.temperature < 32) {
 		pumpModeTarget = 'balanced';
 	}
 
@@ -263,7 +285,7 @@ async function getData() {
 
 	await getTemperature();
 
-	console.log('getData()            :: status: %s', JSON.stringify(status));
+	console.log('getData()            :: status: %o', status.data);
 
 	await updatePumpMode();
 
@@ -514,6 +536,17 @@ async function init() {
 		deviceStatus.polling = true;
 	}
 
+	try {
+		port = new SerialPort('/dev/tty.usbmodem14A201', { baudRate : 115200 });
+
+		port.pipe(parser);
+
+		parser.on('data', async (data) => { await parseControllerData(data); });
+	}
+	catch (err) {
+		console.error(err);
+	}
+
 	return true;
 } // async init()
 
@@ -623,6 +656,6 @@ async function term(exitCode = 0) {
 	await getData();
 	await getInfo();
 
-	intervalGetData = setInterval(getData, 500);
+	intervalGetData = setInterval(getData, 2000);
 	// await term();
 })();

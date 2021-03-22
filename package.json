@@ -1,7 +1,10 @@
 {
 	"author": "",
 	"dependencies": {
+		"@hotgarbage/ioreg": "^0.0.2",
+		"@serialport/parser-readline": "^9.0.7",
 		"express": "^4.17.1",
+		"serialport": "^9.0.7",
 		"usb": "^1.6.5"
 	},
 	"description": "",
