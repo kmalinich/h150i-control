@@ -28,6 +28,9 @@ const status = {
 		setPumpMode : null,
 	},
 
+	fanController : {
+	},
+
 	data : {
 		fan0Speed : null,
 		fan1Speed : null,
@@ -61,7 +64,7 @@ async function parseControllerData(data) {
 	try {
 		const parsedData = JSON.parse(data);
 
-		status.data.controller = parsedData;
+		status.fanController = parsedData;
 
 		// console.log({ parsedData });
 
@@ -239,15 +242,28 @@ async function updatePumpMode() {
 		return;
 	}
 
+	const cTemp = status.data.temperature;
 
-	let pumpModeTarget = 'performance';
-	if (status.data.temperature < 29) {
-		pumpModeTarget = 'quiet';
-	}
-	else if (status.data.temperature < 32) {
-		pumpModeTarget = 'balanced';
-	}
+	let pumpModeTarget = status.data.pumpMode;
+	switch (status.data.pumpMode) {
+		case 'quiet' : {
+			if (cTemp >= 29) pumpModeTarget = 'balanced';
+			break;
+		}
 
+		case 'balanced' : {
+			if (cTemp <= 28) pumpModeTarget = 'quiet';
+			if (cTemp >= 30) pumpModeTarget = 'performance';
+			break;
+		}
+
+		case 'performance' : {
+			if (cTemp <= 29) pumpModeTarget = 'balanced';
+			break;
+		}
+
+		default : pumpModeTarget = 'performance';
+	}
 
 	if (status.data.pumpMode === pumpModeTarget) {
 		// console.log('updatePumpMode()     :: correct mode %o already set', pumpModeTarget);
@@ -285,7 +301,7 @@ async function getData() {
 
 	await getTemperature();
 
-	console.log('getData()            :: status: %o', status.data);
+	console.log('getData()            :: status: %o', status);
 
 	await updatePumpMode();
 
