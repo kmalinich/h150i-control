@@ -1,5 +1,27 @@
 /* eslint-disable no-unused-vars */
 
+const { Console } = require('console');
+
+const consoleOptions = {
+	stdout           : process.stdout,
+	stderr           : process.stderr,
+	ignoreErrors     : true,
+	colorMode        : 'auto',
+	groupIndentation : 0,
+
+	inspectOptions : {
+		breakLength     : Infinity,
+		compact         : true,
+		depth           : Infinity,
+		maxArrayLength  : Infinity,
+		maxStringLength : Infinity,
+		showHidden      : false,
+	},
+};
+
+const minLog = new Console(consoleOptions);
+
+
 const usb = require('usb');
 
 const SerialPort = require('serialport');
@@ -45,6 +67,10 @@ const status = {
 		temperature : 29,
 	},
 
+	somethingsBroken : {
+		somethingsBroken : null,
+	},
+
 	version : {
 		firmware : null,
 		hardware : null,
@@ -63,7 +89,11 @@ let intervalGetData;
 let shuttingDown = false;
 
 
-async function parseControllerData(data) {
+function updateControllerTemp(temperatureValue) {
+	port.write('#tmp' + temperatureValue + '\n');
+} // updateControllerTemp(temperatureValue)
+
+function parseControllerData(data) {
 	try {
 		const parsedData = JSON.parse(data);
 
@@ -72,15 +102,13 @@ async function parseControllerData(data) {
 
 		// console.log('parseControllerData() :: parsedData', parsedData);
 
-		port.write('#tmp' + status.data.temperature + '\n');
-
 		setFanSpeedPwm(0, status.fanController.pwmDutyPct);
 		setFanSpeedPwm(1, status.fanController.pwmDutyPct);
 		setFanSpeedPwm(2, status.fanController.pwmDutyPct);
 	}
 	// eslint-disable-next-line no-empty
 	catch (e) {}
-} // async parseControllerData(data);
+} // parseControllerData(data);
 
 
 async function getFirmwareVersion() {
@@ -310,14 +338,16 @@ async function getData() {
 	await getTemperature();
 
 	const statusObj = {
-		fanCtrl     : status.fanController,
-		fanRpm      : [ status.data.fan0Speed, status.data.fan1Speed, status.data.fan2Speed ],
-		pumpRpm     : status.data.pumpSpeed,
-		pumpMode    : status.data.pumpMode,
-		temperature : status.data.temperature,
+		temp    : status.data.temperature,
+		fans    : [ status.data.fan0Speed, status.data.fan1Speed, status.data.fan2Speed ],
+		pump    : [ status.data.pumpMode, status.data.pumpSpeed ],
+		fanCtrl : {
+			temp : status.fanController.temperatureCurrent,
+			duty : status.fanController.pwmDutyPct,
+		},
 	};
 
-	console.log(statusObj);
+	minLog.log(statusObj);
 	// console.log('getData()             :: status: %o', status);
 
 	updatePumpMode();
@@ -328,6 +358,37 @@ async function getData() {
 
 function handleResponse(data) {
 	// console.log('handleResponse()      :: data: %o', data);
+
+	let packetClass;
+	switch (data[0]) {
+		case 0x31 :
+		case 0x33 :
+		case 0x41 :
+		case 0xA9 : {
+			packetClass = 'data';
+			break;
+		}
+
+		case 0x32 :
+		case 0x42 :
+		case 0x43 : {
+			packetClass = 'command';
+			break;
+		}
+
+		case 0x8F : {
+			packetClass = 'somethingsBroken';
+			break;
+		}
+
+		case 0xAA :
+		case 0xAB : {
+			packetClass = 'version';
+			break;
+		}
+
+		default : packetClass = 'unknown';
+	}
 
 
 	let packetType;
@@ -351,10 +412,10 @@ function handleResponse(data) {
 		default : packetType = 'unknown';
 	}
 
+
 	let packetValue;
 	switch (data[0]) {
 		case 0x31 : packetValue = data.readInt16BE(3); break;
-
 
 		case 0x33 :
 			switch (data[3]) {
@@ -370,6 +431,8 @@ function handleResponse(data) {
 		case 0x42 :
 		case 0x43 : packetValue = Boolean(data[1] === 0x12 && data[2] === 0x34); break;
 
+		case 0x8F : packetValue = data; break;
+
 		case 0xA9 : packetValue = data[3] + (data[4] / 10); break;
 
 		case 0xAA :	packetValue = data[3] + '.' + data[4] + '.' + data[5] + '.' + data[6]; break;
@@ -379,35 +442,19 @@ function handleResponse(data) {
 	}
 
 
-	let packetClass;
-	switch (data[0]) {
-		case 0x31 :
-		case 0x33 :
-		case 0x41 :
-		case 0xA9 : {
-			packetClass = 'data';
+	switch (packetType) {
+		case 'temperature' : {
+			updateControllerTemp(packetValue);
 			break;
 		}
 
-		case 0x32 :
-		case 0x42 :
-		case 0x43 : {
-			packetClass = 'command';
+		case 'somethingsBroken' : {
+			const packet = { packetClass, packetType, packetValue };
+			console.log('handleResponse()      :: packet: %o', packet);
 			break;
 		}
-
-		case 0xAA :
-		case 0xAB : {
-			packetClass = 'version';
-			break;
-		}
-
-		default : packetClass = 'unknown';
 	}
 
-
-	// const packet = { packetClass, packetType, packetValue };
-	// console.log('handleResponse()      :: packet: %s', JSON.stringify(packet));
 
 	status[packetClass][packetType] = packetValue;
 } // handleResponse(data)
@@ -571,10 +618,8 @@ async function init() {
 
 	try {
 		port = new SerialPort('/dev/tty.usbmodem14A201', { baudRate : 115200 });
-
 		port.pipe(parser);
-
-		parser.on('data', async (data) => { await parseControllerData(data); });
+		parser.on('data', parseControllerData);
 	}
 	catch (err) {
 		console.error(err);
