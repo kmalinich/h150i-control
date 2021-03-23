@@ -1,5 +1,9 @@
 /* eslint-disable no-unused-vars */
 
+const refreshInterval   = 2000;
+const temperatureTarget = 31;
+
+
 const { Console } = require('console');
 
 const consoleOptions = {
@@ -64,7 +68,7 @@ const status = {
 		pumpMode  : null,
 		pumpSpeed : null,
 
-		temperature : 29,
+		temperature : temperatureTarget,
 	},
 
 	somethingsBroken : {
@@ -298,22 +302,21 @@ function updatePumpMode() {
 		return;
 	}
 
-
 	let pumpModeTarget = cPump;
 	switch (cPump) {
 		case 0 : {
-			if (cTemp >= 29) pumpModeTarget = 1;
+			if (cTemp >= (temperatureTarget + 1)) pumpModeTarget = 1;
 			break;
 		}
 
 		case 1 : {
-			if (cTemp <= 28) pumpModeTarget = 0;
-			if (cTemp >= 30) pumpModeTarget = 2;
+			if (cTemp <= temperatureTarget) pumpModeTarget = 0;
+			if (cTemp >= (temperatureTarget + 2)) pumpModeTarget = 2;
 			break;
 		}
 
 		case 2 : {
-			if (cTemp <= 29) pumpModeTarget = 1;
+			if (cTemp <= (temperatureTarget + 1)) pumpModeTarget = 1;
 			break;
 		}
 
@@ -740,6 +743,6 @@ async function term(exitCode = 0) {
 	await getData();
 	await getInfo();
 
-	intervalGetData = setInterval(getData, 2000);
+	intervalGetData = setInterval(getData, refreshInterval);
 	// await term();
 })();
