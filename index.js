@@ -325,7 +325,7 @@ function updatePumpMode() {
 	}
 
 	// Determine based on fan duty cycle
-	if (status.fanController.pwmDutyPct >= 10) {
+	if (status.fanController.pwmDutyPct >= 4) {
 		pumpModeTarget = 1;
 	}
 

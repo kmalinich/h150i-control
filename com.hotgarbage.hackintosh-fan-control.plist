@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+	<dict>
+		<key>Label</key>
+		<string>com.hotgarbage.hackintosh-fan-control</string>
+		<key>EnvironmentVariables</key>
+		<dict>
+			<key>PATH</key>
+			<string>/usr/local/opt/coreutils/libexec/gnubin:/usr/local/opt/net-snmp/bin:/usr/local/opt/go/libexec/bin:/usr/local/opt/coreutils/libexec/gnubin:/usr/local/opt/findutils/libexec/gnubin:/usr/local/opt/gawk/libexec/gnubin:/usr/local/opt/gnu-sed/libexec/gnubin:/usr/local/opt/gnu-tar/libexec/gnubin:/usr/local/opt/grep/libexec/gnubin:/usr/local/opt/curl-openssl/bin:/usr/local/opt/curl/bin:/usr/local/opt/gnu-getopt/bin:/usr/local/opt/gnu-which/bin:/usr/local/opt/python@3.8/libexec/bin:/usr/local/opt/python3/libexec/bin:/usr/local/opt/python/libexec/bin:/usr/local/opt/libxml2/bin:/usr/local/opt/openssl@1.1/bin:/usr/local/opt/openssl/bin:/usr/local/sbin:/usr/local/bin:/System/Library/Filesystems/apfs.fs/Contents/Resources:/System/Library/CoreServices:/usr/libexec:/sbin:/bin:/usr/sbin:/usr/bin:/opt/X11/bin</string>
+			<key>NODE_ENV</key>
+			<string>production</string>
+			<key>NODE_PATH</key>
+			<string>${SOME_DIR}/hackintosh-fan-control/node_modules:/usr/local/lib/node_modules</string>
+		</dict>
+		<key>WorkingDirectory</key>
+		<string>${SOME_DIR}/hackintosh-fan-control</string>
+		<key>ProgramArguments</key>
+		<array>
+			<string>/usr/local/bin/node</string>
+			<string>--throw-deprecation</string>
+			<string>--trace-warnings</string>
+			<string>${SOME_DIR}/hackintosh-fan-control/index.js</string>
+		</array>
+		<key>KeepAlive</key>
+		<true/>
+		<key>RunAtLoad</key>
+		<true/>
+	</dict>
+</plist>
