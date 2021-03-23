@@ -183,6 +183,9 @@ async function setFanSpeedPwm(fanId, pwmValue) {
 	if (typeof fanId    !== 'number') return;
 	if (typeof pwmValue !== 'number') return;
 
+	if (pwmValue < 0)   pwmValue = 0;
+	if (pwmValue > 100) pwmValue = 100;
+
 	try {
 		// logFmt('setFanSpeedPwm', 'args', { fanId, pwmValue });
 		await send([ 0x42, fanId, pwmValue ]);
@@ -197,6 +200,9 @@ async function setFanSpeedPwm(fanId, pwmValue) {
 async function setFanSpeedRpm(fanId, rpmValue) {
 	if (typeof fanId    !== 'number') return;
 	if (typeof rpmValue !== 'number') return;
+
+	if (rpmValue < 0)    rpmValue = 0;
+	if (rpmValue > 1600) rpmValue = 1600;
 
 	try {
 		// logFmt('setFanSpeedRpm', 'args', { fanId, rpmValue });
