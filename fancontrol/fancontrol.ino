@@ -15,9 +15,9 @@ double pwmMax = 79.0;
 
 // PID control tuning parameters
 // Great writeup: https://github.com/CapnBry/HeaterMeter/wiki/PID-Controller-Theory
-double KP = 1.8; // Determines how aggressively the PID reacts to current amount of error (Proportional)
-double KI = 1.8; // Determines how aggressively the PID reacts to error over time         (Integral)
-double KD = 7.2; // Determines how aggressively the PID reacts to change in error         (Derivative)
+double KP = 0.90; // Determines how aggressively the PID reacts to current amount of error (Proportional)
+double KI = 0.45; // Determines how aggressively the PID reacts to error over time         (Integral)
+double KD = 7.20; // Determines how aggressively the PID reacts to change in error         (Derivative)
 
 // Temperature target for PID control
 double temperatureTarget = 31.0;

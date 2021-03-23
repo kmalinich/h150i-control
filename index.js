@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 
-const refreshInterval   = 2000;
+const refreshInterval   = 1000;
 const temperatureTarget = 31;
 
 
