@@ -55,9 +55,9 @@ const status = {
 	},
 
 	fanController : {
-		pidControl         : null,
-		pwmDutyPct         : null,
-		temperatureCurrent : null,
+		pidControl         : 1,
+		pwmDutyPct         : 0,
+		temperatureCurrent : temperatureTarget,
 	},
 
 	data : {
@@ -302,26 +302,37 @@ function updatePumpMode() {
 		return;
 	}
 
+	// Determine based on coolant temperature vs target temperature
 	let pumpModeTarget = cPump;
 	switch (cPump) {
 		case 0 : {
-			if (cTemp >= temperatureTarget) pumpModeTarget = 1;
+			if (cTemp >= (temperatureTarget + 0.5)) pumpModeTarget = 1;
 			break;
 		}
 
 		case 1 : {
-			if (cTemp <= (temperatureTarget - 1)) pumpModeTarget = 0;
-			if (cTemp >= (temperatureTarget + 1)) pumpModeTarget = 2;
+			if (cTemp <= (temperatureTarget - 0.5)) pumpModeTarget = 0;
+			if (cTemp >= (temperatureTarget + 1.5)) pumpModeTarget = 2;
 			break;
 		}
 
 		case 2 : {
-			if (cTemp <= temperatureTarget) pumpModeTarget = 1;
+			if (cTemp <= (temperatureTarget + 0.5)) pumpModeTarget = 1;
 			break;
 		}
 
 		default : pumpModeTarget = 2;
 	}
+
+	// Determine based on fan duty cycle
+	if (status.fanController.pwmDutyPct >= 10) {
+		pumpModeTarget = 1;
+	}
+
+	if (status.fanController.pwmDutyPct >= 20) {
+		pumpModeTarget = 2;
+	}
+
 
 	if (cPump === pumpModeTarget) {
 		// logFmt('updatePumpMode', 'correct mode already set', pumpModeTarget);
