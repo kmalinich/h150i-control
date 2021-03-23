@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 
-const refreshInterval   = 1000;
-const temperatureTarget = 31;
+const refreshInterval   = 2000;
+const temperatureTarget = 32;
 
 
 const { Console } = require('console');
@@ -645,7 +645,7 @@ async function init() {
 	}
 
 	try {
-		port = new SerialPort('/dev/tty.usbmodem14A201', { baudRate : 115200 });
+		port = new SerialPort('/dev/tty.usbmodem145201', { baudRate : 115200 });
 		port.pipe(parser);
 		parser.on('data', parseControllerData);
 	}

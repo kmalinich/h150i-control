@@ -17,10 +17,10 @@ double pwmMax = 79.0;
 // Great writeup: https://github.com/CapnBry/HeaterMeter/wiki/PID-Controller-Theory
 double KP = 0.90; // Determines how aggressively the PID reacts to current amount of error (Proportional)
 double KI = 0.45; // Determines how aggressively the PID reacts to error over time         (Integral)
-double KD = 7.20; // Determines how aggressively the PID reacts to change in error         (Derivative)
+double KD = 10.8; // Determines how aggressively the PID reacts to change in error         (Derivative)
 
 // Temperature target for PID control
-double temperatureTarget = 31.0;
+double temperatureTarget = 32.0;
 
 // Temperature sent from host
 double temperatureCurrent = temperatureTarget;
@@ -164,7 +164,7 @@ void setup() {
 
 	// DEBUGLN("[INIT] PID control");
 	fan0PID.SetOutputLimits(pwmMin, pwmMax);
-	fan0PID.SetSampleTime(2000);
+	fan0PID.SetSampleTime(1500);
 	fan0PID.Start(temperatureCurrent, pwmMin, temperatureTarget);
 
 	// DEBUGLN("[INIT] Complete");
