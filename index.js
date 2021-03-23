@@ -305,18 +305,18 @@ function updatePumpMode() {
 	let pumpModeTarget = cPump;
 	switch (cPump) {
 		case 0 : {
-			if (cTemp >= (temperatureTarget + 1)) pumpModeTarget = 1;
+			if (cTemp >= temperatureTarget) pumpModeTarget = 1;
 			break;
 		}
 
 		case 1 : {
-			if (cTemp <= temperatureTarget) pumpModeTarget = 0;
-			if (cTemp >= (temperatureTarget + 2)) pumpModeTarget = 2;
+			if (cTemp <= (temperatureTarget - 1)) pumpModeTarget = 0;
+			if (cTemp >= (temperatureTarget + 1)) pumpModeTarget = 2;
 			break;
 		}
 
 		case 2 : {
-			if (cTemp <= (temperatureTarget + 1)) pumpModeTarget = 1;
+			if (cTemp <= temperatureTarget) pumpModeTarget = 1;
 			break;
 		}
 
