@@ -3,6 +3,8 @@
 const refreshInterval   = 2000;
 const temperatureTarget = 32;
 
+const fanControllerSerial = '55739323930351F042C1';
+
 
 const { Console } = require('console');
 
@@ -29,7 +31,8 @@ const minLog = new Console(consoleOptions);
 const usb = require('usb');
 
 const SerialPort = require('serialport');
-const Readline = require('@serialport/parser-readline');
+const bindings   = require('@serialport/bindings');
+const Readline   = require('@serialport/parser-readline');
 
 const parser = new Readline({ delimiter : '\r\n' });
 
@@ -106,6 +109,28 @@ function logFmt(funcName, varName, obj) {
 
 function logAll(data) {
 	console.dir(data, { depth : null, showHidden : true });
+}
+
+
+async function getPortPath() {
+	try {
+		let portPath = null;
+
+		const ports = await bindings.list();
+
+		for (const port of ports) {
+			if (port.serialNumber !== fanControllerSerial) continue;
+
+			portPath = port.path;
+
+			return portPath;
+		}
+	}
+	catch (bindingsListError) {
+		logFmt('bindingsList', 'bindingsListError');
+		logAll(bindingsListError);
+		await term(1);
+	}
 }
 
 
@@ -645,7 +670,8 @@ async function init() {
 	}
 
 	try {
-		port = new SerialPort('/dev/tty.usbmodem145201', { baudRate : 115200 });
+		const portPath = await getPortPath();
+		port = new SerialPort(portPath, { baudRate : 115200 });
 		port.pipe(parser);
 		parser.on('data', parseControllerData);
 	}
