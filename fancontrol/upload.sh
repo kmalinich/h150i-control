@@ -3,7 +3,7 @@
 BOARD="arduino:avr:uno"
 OUTPUT_DIR="${PWD}/build"
 
-PORT_DEF="$(serialport-list --format json | jq -r '.[] | select(.manufacturer == "Arduino (www.arduino.cc)") | .path')"
+PORT_DEF="$(serialport-list --format json | jq -r '.[] | select(.manufacturer != null) | select(.manufacturer | contains("Arduino")) | .path')"
 PORT="${1-$PORT_DEF}"
 
 rm -rf "${OUTPUT_DIR}"
