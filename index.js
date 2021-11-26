@@ -1,12 +1,16 @@
 /* eslint-disable no-unused-vars */
 
-const refreshInterval   = 2000;
+const refreshInterval   = 1000;
 const temperatureTarget = 32;
 
-const fanControllerSerial = '55739323930351F042C1';
+const globalDelay   = 100;
+const globalTimeout = (refreshInterval * 2);
 
+
+const usb = require('usb');
 
 const { Console } = require('console');
+
 
 const consoleOptions = {
 	stdout           : process.stdout,
@@ -28,21 +32,6 @@ const consoleOptions = {
 const minLog = new Console(consoleOptions);
 
 
-const usb = require('usb');
-
-const SerialPort = require('serialport');
-const bindings   = require('@serialport/bindings');
-const Readline   = require('@serialport/parser-readline');
-
-const parser = new Readline({ delimiter : '\r\n' });
-
-let port;
-
-
-const globalDelay   = 50;
-const globalTimeout = 500;
-
-
 const status = {
 	command : {
 		setFanSpeedPwm : null,
@@ -57,12 +46,6 @@ const status = {
 		polling : false,
 	},
 
-	fanController : {
-		pidControl         : 1,
-		pwmDutyPct         : 0,
-		temperatureCurrent : temperatureTarget,
-	},
-
 	data : {
 		fan0Speed : null,
 		fan1Speed : null,
@@ -71,7 +54,7 @@ const status = {
 		pumpMode  : null,
 		pumpSpeed : null,
 
-		temperature : temperatureTarget,
+		temperature : 40,
 	},
 
 	somethingsBroken : {
@@ -91,7 +74,7 @@ let deviceInterface;
 let endpointIn;
 let endpointOut;
 
-let intervalGetData;
+let expectedResponseCount = 0;
 
 let shuttingDown = false;
 
@@ -110,50 +93,6 @@ function logFmt(funcName, varName, obj) {
 function logAll(data) {
 	console.dir(data, { depth : null, showHidden : true });
 }
-
-
-async function getPortPath() {
-	try {
-		let portPath = null;
-
-		const ports = await bindings.list();
-
-		for (const port of ports) {
-			if (port.serialNumber !== fanControllerSerial) continue;
-
-			portPath = port.path;
-
-			return portPath;
-		}
-	}
-	catch (bindingsListError) {
-		logFmt('bindingsList', 'bindingsListError');
-		logAll(bindingsListError);
-		await term(1);
-	}
-}
-
-
-function updateControllerTemp(temperatureValue) {
-	port.write('#tmp' + temperatureValue + '\n');
-} // updateControllerTemp(temperatureValue)
-
-function parseControllerData(data) {
-	try {
-		const parsedData = JSON.parse(data);
-
-		status.fanController = parsedData;
-		status.fanController.pidControl = Boolean(status.fanController.pidControl);
-
-		// logFmt('parseControllerData', 'parsedData', parsedData);
-
-		setFanSpeedPwm(0, status.fanController.pwmDutyPct);
-		setFanSpeedPwm(1, status.fanController.pwmDutyPct);
-		setFanSpeedPwm(2, status.fanController.pwmDutyPct);
-	}
-	// eslint-disable-next-line no-empty
-	catch (e) {}
-} // parseControllerData(data);
 
 
 async function getFirmwareVersion() {
@@ -183,7 +122,7 @@ async function getHardwareVersion() {
 
 async function getTemperature() {
 	try {
-		// logFmt('getTemperature', 'getTemperature');
+		logFmt('getTemperature', 'getTemperature');
 		await send([ 0xA9 ]);
 	}
 	catch (getTemperatureError) {
@@ -198,7 +137,7 @@ async function getFanSpeed(fanId) {
 	if (typeof fanId !== 'number') return;
 
 	try {
-		// logFmt('getFanSpeed', 'fanId', fanId);
+		logFmt('getFanSpeed', 'fanId', fanId);
 		await send([ 0x41, fanId ]);
 	}
 	catch (getFanSpeedError) {
@@ -267,19 +206,19 @@ async function setFanSpeedCustomCurve(fanId, tempValues, pwmValues) {
 
 async function getPumpMode() {
 	try {
-		// logFmt('getPumpMode', 'getPumpModeStep0');
+		logFmt('getPumpMode', 'getPumpMode');
 		await send([ 0x33 ]);
 	}
-	catch (getPumpModeStep0Error) {
-		logFmt('getPumpMode', 'getPumpModeStep0Error');
-		logAll(getPumpModeStep0Error);
+	catch (getPumpModeError) {
+		logFmt('getPumpMode', 'getPumpModeError');
+		logAll(getPumpModeError);
 		await term(5);
 	}
 } // async getPumpMode()
 
 async function getPumpSpeed() {
 	try {
-		// logFmt('getPumpSpeed', 'getPumpSpeed');
+		logFmt('getPumpSpeed', 'getPumpSpeed');
 		await send([ 0x31 ]);
 	}
 	catch (getPumpSpeedError) {
@@ -288,6 +227,7 @@ async function getPumpSpeed() {
 		await term(6);
 	}
 } // async getPumpSpeed()
+
 
 async function setPumpMode(pumpMode) {
 	// logFmt('setPumpMode', 'pumpMode', pumpMode);
@@ -349,15 +289,6 @@ function updatePumpMode() {
 		default : pumpModeTarget = 2;
 	}
 
-	// Determine based on fan duty cycle
-	if (status.fanController.pwmDutyPct >= 4) {
-		pumpModeTarget = 1;
-	}
-
-	if (status.fanController.pwmDutyPct >= 20) {
-		pumpModeTarget = 2;
-	}
-
 
 	if (cPump === pumpModeTarget) {
 		// logFmt('updatePumpMode', 'correct mode already set', pumpModeTarget);
@@ -377,12 +308,14 @@ async function send(data) {
 		// logFmt('send', 'data', data);
 		await new Promise((resolve, reject) => endpointOut.transfer(data, resolve, reject));
 		await new Promise(resolve => setTimeout(resolve, globalDelay));
+		expectedResponseCount++;
 	}
 	catch (sendError) {
 		logFmt('send', 'sendError');
 		logAll(sendError);
 	}
 } // async send(data)
+
 
 async function getInfo() {
 	if (shuttingDown !== false) return;
@@ -400,33 +333,50 @@ async function getData() {
 
 	// logFmt('getData', 'begin');
 
-	await getFanSpeed(0);
-	await getFanSpeed(1);
-	await getFanSpeed(2);
+	// await getFanSpeed(0);
+	// await getFanSpeed(1);
+	// await getFanSpeed(2);
+
+	// eslint-disable-next-line no-unmodified-loop-condition
+	while (expectedResponseCount > 0) {
+		logFmt('getData', 'expectedResponseCount', expectedResponseCount);
+		await new Promise(resolve => setTimeout(resolve, 250));
+	}
 
 	await getPumpMode();
+
+	// eslint-disable-next-line no-unmodified-loop-condition
+	while (expectedResponseCount > 0) {
+		logFmt('getData', 'expectedResponseCount', expectedResponseCount);
+		await new Promise(resolve => setTimeout(resolve, 250));
+	}
+
 	await getPumpSpeed();
+
+	// eslint-disable-next-line no-unmodified-loop-condition
+	while (expectedResponseCount > 0) {
+		logFmt('getData', 'expectedResponseCount', expectedResponseCount);
+		await new Promise(resolve => setTimeout(resolve, 250));
+	}
 
 	await getTemperature();
 
 	const statusObj = {
-		temp    : status.data.temperature,
-		fans    : [ status.data.fan0Speed, status.data.fan1Speed, status.data.fan2Speed ],
-		pump    : [ status.data.pumpMode, status.data.pumpSpeed ],
-		fanCtrl : {
-			temp : status.fanController.temperatureCurrent,
-			duty : status.fanController.pwmDutyPct,
-		},
+		temp : status.data.temperature,
+		fans : [ status.data.fan0Speed, status.data.fan1Speed, status.data.fan2Speed ],
+		pump : [ status.data.pumpMode, status.data.pumpSpeed ],
 	};
 
 	logFmt('getData', 'status', statusObj);
 
-	updatePumpMode();
+	// updatePumpMode();
 } // async getData()
 
 
 function handleResponse(data) {
-	// logFmt('handleResponse', 'data', data);
+	expectedResponseCount--;
+
+	logFmt('handleResponse', 'data', data);
 
 	let packetClass;
 	switch (data[0]) {
@@ -507,7 +457,7 @@ function handleResponse(data) {
 
 	switch (packetType) {
 		case 'temperature' : {
-			updateControllerTemp(packetValue);
+			// updateControllerTemp(packetValue);
 			break;
 		}
 
@@ -520,7 +470,9 @@ function handleResponse(data) {
 
 
 	status[packetClass][packetType] = packetValue;
+	logFmt('handleResponse', `status.${packetClass}.${packetType}`, packetValue);
 } // handleResponse(data)
+
 
 async function init() {
 	device = await usb.findByIds(0x1B1C, 0x0C12);
@@ -641,10 +593,16 @@ async function init() {
 	endpointIn.on('data', handleResponse);
 
 	endpointIn.on('error', async endpointInError => {
-		logFmt('endpointIn.onError', 'endpointOutError');
+		logFmt('endpointIn.onError', 'endpointInError');
 		logAll(endpointInError);
 		await term(13);
 	});
+
+	endpointIn.on('end', async endpointInEnd => {
+		logFmt('endpointIn.onEnd', 'endpointInEnd');
+		logAll(endpointInEnd);
+	});
+
 
 	endpointOut.on('error', async endpointOutError => {
 		logFmt('endpointOut.onError', 'endpointOutError');
@@ -652,11 +610,16 @@ async function init() {
 		await term(14);
 	});
 
+	endpointOut.on('end', async endpointOutEnd => {
+		logFmt('endpointOut.onEnd', 'endpointOutEnd');
+		logAll(endpointOutEnd);
+	});
+
 
 	if (status.device.polling === false) {
 		try {
 			// logFmt('init', 'endpointIn polling start', 'begin');
-			await endpointIn.startPoll(1, 10);
+			await endpointIn.startPoll(); // 1, 10
 			// logFmt('init', 'endpointIn polling start', 'end');
 		}
 		catch (endpointInStartPollError) {
@@ -669,18 +632,9 @@ async function init() {
 		status.device.polling = true;
 	}
 
-	try {
-		const portPath = await getPortPath();
-		port = new SerialPort(portPath, { baudRate : 115200 });
-		port.pipe(parser);
-		parser.on('data', parseControllerData);
-	}
-	catch (err) {
-		console.error(err);
-	}
-
 	return true;
 } // async init()
+
 
 // Configure term event listeners
 async function termConfig() {
@@ -696,7 +650,7 @@ async function termConfig() {
 		await term(0);
 	});
 
-	process.once('exit', async () => {
+	process.once('exit', () => {
 		logFmt('Caught', 'exit event');
 	});
 } // async term_config()
@@ -704,19 +658,11 @@ async function termConfig() {
 async function term(exitCode = 0) {
 	shuttingDown = true;
 
-	clearInterval(intervalGetData);
-
 	// Wait for globalTimeout ms for any last bytes to come through
 	await new Promise(resolve => setTimeout(resolve, globalTimeout));
 
-	if (typeof endpointIn !== 'undefined') {
-		endpointIn.removeAllListeners('data');
-		endpointIn.removeAllListeners('error');
-	}
 
-	if (typeof endpointOut !== 'undefined') {
-		endpointOut.removeAllListeners('error');
-	}
+	let errorCount = 0;
 
 	if (status.device.polling === true) {
 		try {
@@ -728,6 +674,7 @@ async function term(exitCode = 0) {
 		catch (endpointInStopPollError) {
 			logFmt('term', 'endpointInStopPollError');
 			logAll(endpointInStopPollError);
+			errorCount++;
 		}
 
 		status.device.polling = false;
@@ -744,6 +691,7 @@ async function term(exitCode = 0) {
 		catch (deviceInterfaceReleaseError) {
 			logFmt('term', 'deviceInterfaceReleaseError');
 			logAll(deviceInterfaceReleaseError);
+			errorCount++;
 		}
 
 		status.device.claimed = false;
@@ -760,26 +708,40 @@ async function term(exitCode = 0) {
 		catch (deviceCloseError) {
 			logFmt('term', 'deviceCloseError');
 			logAll(deviceCloseError);
+			errorCount++;
 		}
 
 		status.device.open = false;
 	}
 
-	process.exit(exitCode);
-} // async term()
+
+	if (typeof endpointIn !== 'undefined') {
+		endpointIn.removeAllListeners('data');
+		endpointIn.removeAllListeners('end');
+		endpointIn.removeAllListeners('error');
+	}
+
+	if (typeof endpointOut !== 'undefined') {
+		endpointOut.removeAllListeners('end');
+		endpointOut.removeAllListeners('error');
+	}
+
+	if (errorCount === 0) {
+		process.exit(exitCode);
+	}
+} // async term(exitCode)
 
 
 (async () => {
 	await termConfig();
 	await init();
 
+	await new Promise(resolve => setTimeout(resolve, 1000));
+
 	// await setFanSpeedRpm(0, 700);
 	// await setFanSpeedRpm(1, 700);
 	// await setFanSpeedRpm(2, 700);
 
 	await getData();
-	await getInfo();
-
-	intervalGetData = setInterval(getData, refreshInterval);
-	// await term();
+	// await getInfo();
 })();
