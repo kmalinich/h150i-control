@@ -1,15 +1,11 @@
 {
 	"env": {
-		"browser": false,
-		"es6": true,
-		"jquery": false,
-		"node": true,
-		"serviceworker": false,
-		"worker": false
+		"amd": true,
+		"es2021": true,
+		"node": true
 	},
 	"extends": [
-		"eslint:recommended",
-		"esnext"
+		"eslint:recommended"
 	],
 	"globals": {
 		"api": false,
@@ -22,8 +18,7 @@
 		"objfmt": false,
 		"status": true,
 		"terminating": false,
-		"update": false,
-		"xbee": false
+		"update": false
 	},
 	"parserOptions": {
 		"ecmaFeatures": {
@@ -31,14 +26,12 @@
 			"impliedStrict": true,
 			"jsx": false
 		},
-		"ecmaVersion": 11,
+		"ecmaVersion": 12,
 		"sourceType": "module"
 	},
 	"plugins": [
 		"import",
-		"node",
-		"promise",
-		"standard"
+		"node"
 	],
 	"rules": {
 		"accessor-pairs": "error",
@@ -345,8 +338,6 @@
 				"switches": "never"
 			}
 		],
-		"prefer-promise-reject-errors": "error",
-		"promise/param-names": "error",
 		"quotes": [
 			"error",
 			"single",
@@ -426,11 +417,6 @@
 				}
 			}
 		],
-		"standard/computed-property-even-spacing": [
-			"error",
-			"even"
-		],
-		"standard/no-callback-literal": "error",
 		"symbol-description": "error",
 		"template-curly-spacing": [
 			"error",

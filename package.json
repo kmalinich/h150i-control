@@ -1,15 +1,22 @@
 {
-	"author": "",
+	"author": "kdm <kennygprs@gmail.com>",
 	"dependencies": {
 		"@hotgarbage/ioreg": "^0.0.2",
-		"@serialport/bindings": "^9.0.7",
-		"@serialport/parser-readline": "^9.0.7",
+		"@serialport/bindings": "^9.2.8",
+		"@serialport/parser-readline": "^9.2.4",
 		"express": "^4.17.1",
-		"serialport": "^9.0.7",
-		"usb": "^1.6.5"
+		"serialport": "^9.2.8",
+		"usb": "^1.9.1"
 	},
-	"description": "",
-	"license": "ISC",
+	"devDependencies": {
+		"eslint": "^8.3.0",
+		"eslint-plugin-node": "^11.1.0"
+	},
+	"engines": {
+		"node": ">=17"
+	},
+	"description": "Corsair H150i fan speed/pump control and interface",
+	"license": "MIT",
 	"main": "index.js",
 	"name": "corsairlink",
 	"scripts": {
